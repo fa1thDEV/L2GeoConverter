@@ -17,16 +17,22 @@ FAR = 64               # |Δh| > FAR — “different terrain”
 
 
 def region_files(d):
-    """Folder files: name stem → path (.l2j preferred over _conv.dat).
+    """Folder files: name stem → path (.l2j/.l2g preferred over _conv.dat).
     The stem keeps the suffix: 27_24_Classic is a separate region from 27_24;
     coordinates must be extracted from the first two numbers in the name."""
     out = {}
     for f in sorted(glob.glob(os.path.join(d, '*.l2j'))) + \
+             sorted(glob.glob(os.path.join(d, '*.l2g'))) + \
              sorted(glob.glob(os.path.join(d, '*_conv.dat'))):
         base = os.path.basename(f)
         if not re.match(r'^\d+_\d+', base):
             continue
-        stem = base[:-len('_conv.dat')] if base.endswith('_conv.dat') else base[:-len('.l2j')]
+        if base.endswith('_conv.dat'):
+            stem = base[:-len('_conv.dat')]
+        elif base.endswith('.l2g'):
+            stem = base[:-len('.l2g')]
+        else:
+            stem = base[:-len('.l2j')]
         out.setdefault(stem, f)
     return out
 
@@ -42,6 +48,10 @@ def sampled_surface(path, wanted):
     an order of magnitude faster than a full parse_region."""
     fmt = sniff_format(path)
     data = open(path, 'rb').read()
+    if fmt == 'l2g':
+        from .formats import L2GCodec
+        data = L2GCodec.decrypt(data)
+        fmt = 'l2j'
     pos = PTS_HEADER if fmt == 'pts' else 0
     res = {}
     for b in range(BLOCKS):

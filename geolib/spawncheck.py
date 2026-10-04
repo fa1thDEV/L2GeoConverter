@@ -137,6 +137,10 @@ class RegionGeo:
         self.fmt = sniff_format(path)
         with open(path, 'rb') as f:
             self.data = f.read()
+        if self.fmt == 'l2g':
+            from .formats import L2GCodec
+            self.data = L2GCodec.decrypt(self.data)
+            self.fmt = 'l2j'
         self.offs = []
         if self.fmt == 'pts':
             pos = PTS_HEADER
@@ -282,6 +286,9 @@ def _geo_path(geodir, rx, ry):
     if os.path.isfile(p):
         return p
     p = os.path.join(geodir, f'{rx}_{ry}.l2j')
+    if os.path.isfile(p):
+        return p
+    p = os.path.join(geodir, f'{rx}_{ry}.l2g')
     if os.path.isfile(p):
         return p
     return None
