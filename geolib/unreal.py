@@ -29,7 +29,8 @@ def _xor_table(key):
 
 def decrypt(path):
     """Client file → decrypted UE2 package bytes."""
-    raw = open(path, 'rb').read()
+    with open(path, 'rb') as f:
+        raw = f.read()
     if raw[:2] != b'L\x00':                      # no wrapper — already a raw package
         return raw
     header = raw[:28].decode('utf-16-le', 'ignore')

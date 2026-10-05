@@ -41,11 +41,17 @@ class ViewerState:
         # the front takes coordinates from the first two numbers in the name
         out = {}
         for f in sorted(glob.glob(os.path.join(self.primary, '*.l2j')) +
+                        glob.glob(os.path.join(self.primary, '*.l2g')) +
                         glob.glob(os.path.join(self.primary, '*_conv.dat'))):
             base = os.path.basename(f)
             if not re.match(r'^\d+_\d+', base):
                 continue
-            stem = base[:-len('_conv.dat')] if base.endswith('_conv.dat') else base[:-len('.l2j')]
+            if base.endswith('_conv.dat'):
+                stem = base[:-len('_conv.dat')]
+            elif base.endswith('.l2g'):
+                stem = base[:-len('.l2g')]
+            else:
+                stem = base[:-len('.l2j')]
             out.setdefault(stem, f)
         return out
 
