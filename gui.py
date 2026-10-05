@@ -154,8 +154,20 @@ class L2GeoConverterGUI:
         header_frame = Frame(self.root, bg="#1a1e24", pady=10)
         header_frame.pack(fill="x")
 
-        # Load logo if available (support standard execution & PyInstaller _MEIPASS)
+        # Load icon & logo if available (support standard execution & PyInstaller _MEIPASS)
         base_dir = getattr(sys, '_MEIPASS', os.path.dirname(os.path.realpath(__file__)))
+        ico_path = os.path.join(base_dir, "assets", "icon.ico")
+        if not os.path.exists(ico_path):
+            ico_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), "assets", "icon.ico")
+        if not os.path.exists(ico_path):
+            ico_path = os.path.join(os.getcwd(), "assets", "icon.ico")
+
+        if os.path.exists(ico_path):
+            try:
+                self.root.iconbitmap(default=ico_path)
+            except Exception:
+                pass
+
         logo_path = os.path.join(base_dir, "assets", "logo.png")
         if not os.path.exists(logo_path):
             logo_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), "assets", "logo.png")
@@ -164,12 +176,19 @@ class L2GeoConverterGUI:
 
         if os.path.exists(logo_path):
             try:
-                raw_img = PhotoImage(file=logo_path)
-                self.root.iconphoto(True, raw_img)
-                # Downsample image cleanly to fit header
-                sub_x = max(1, raw_img.width() // 280)
-                sub_y = max(1, raw_img.height() // 95)
-                self.logo_img = raw_img.subsample(sub_x, sub_y)
+                if HAS_PIL:
+                    pil_logo = PILImage.open(logo_path).convert("RGBA")
+                    resized = pil_logo.resize((72, 72), PILImage.Resampling.LANCZOS)
+                    self.logo_img = ImageTk.PhotoImage(resized)
+                    self.icon_photo = ImageTk.PhotoImage(pil_logo.resize((64, 64), PILImage.Resampling.LANCZOS))
+                    self.root.iconphoto(True, self.icon_photo)
+                else:
+                    raw_img = PhotoImage(file=logo_path)
+                    self.root.iconphoto(True, raw_img)
+                    sub_x = max(1, raw_img.width() // 80)
+                    sub_y = max(1, raw_img.height() // 80)
+                    self.logo_img = raw_img.subsample(sub_x, sub_y)
+
                 logo_lbl = Label(header_frame, image=self.logo_img, bg="#1a1e24")
                 logo_lbl.pack(pady=(0, 4))
             except Exception:
