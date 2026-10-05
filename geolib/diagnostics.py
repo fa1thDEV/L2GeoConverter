@@ -26,6 +26,7 @@ FLAG_EAST  = 0x01
 FLAG_WEST  = 0x02
 FLAG_SOUTH = 0x04
 FLAG_NORTH = 0x08
+FLAG_ALL   = 0x0F
 
 CELLS_PER_BLOCK = 8
 BLOCKS_PER_AXIS = 256
@@ -77,7 +78,7 @@ class GeoDiagnosticEngine:
         self.cliff_threshold = cliff_threshold
         self.min_clearance = min_clearance
 
-    def analyze(self, path: str, max_issues: int = 100) -> Dict[str, Any]:
+    def analyze(self, path: str, max_issues: int = 100, stop_event=None) -> Dict[str, Any]:
         rx, ry = region_of(path)
         blocks = parse_region(path)
         stats = {
@@ -93,6 +94,8 @@ class GeoDiagnosticEngine:
         issues: List[Dict[str, Any]] = []
 
         for gx in range(CELLS_PER_AXIS):
+            if stop_event and stop_event.is_set():
+                break
             for gy in range(CELLS_PER_AXIS):
                 layers = get_cell_layers(blocks, gx, gy)
 
@@ -146,7 +149,7 @@ class GeoDiagnosticEngine:
                                         "details": {"dir": "EAST", "target_geo": [gx+1, gy]}
                                     })
                             h_diff = abs(h - nh)
-                            if h_diff > self.cliff_threshold:
+                            if h_diff > self.cliff_threshold and h > nh:
                                 stats["cliff_errors"] += 1
                                 if len(issues) < max_issues:
                                     wx, wy, _ = geo_to_world(rx, ry, gx, gy)
@@ -178,7 +181,7 @@ class GeoDiagnosticEngine:
                                         "details": {"dir": "SOUTH", "target_geo": [gx, gy+1]}
                                     })
                             h_diff = abs(h - nh)
-                            if h_diff > self.cliff_threshold:
+                            if h_diff > self.cliff_threshold and h > nh:
                                 stats["cliff_errors"] += 1
                                 if len(issues) < max_issues:
                                     wx, wy, _ = geo_to_world(rx, ry, gx, gy)
@@ -197,7 +200,7 @@ class GeoDiagnosticEngine:
             "sample_issues": issues
         }
 
-    def repair_and_save(self, src_path: str, dst_path: str) -> Dict[str, Any]:
+    def repair_and_save(self, src_path: str, dst_path: str, stop_event=None) -> Dict[str, Any]:
         rx, ry = region_of(src_path)
         blocks = parse_region(src_path)
         stats = {
@@ -212,6 +215,9 @@ class GeoDiagnosticEngine:
             unpacked_blocks.append([[(l[0], l[1]) for l in cell] for cell in blk])
 
         for gx in range(CELLS_PER_AXIS):
+            if stop_event and stop_event.is_set():
+                stats["stopped"] = True
+                return stats
             for gy in range(CELLS_PER_AXIS):
                 layers = get_cell_layers(unpacked_blocks, gx, gy)
 
@@ -232,13 +238,18 @@ class GeoDiagnosticEngine:
                             nh, nnswe = n_layers[match_idx]
                             diff = abs(h - nh)
                             if diff > self.cliff_threshold:
-                                # Seal cliff passage
-                                if (nswe & FLAG_EAST) or (nnswe & FLAG_WEST):
-                                    layers[i] = (h, nswe & ~FLAG_EAST)
-                                    n_layers[match_idx] = (nh, nnswe & ~FLAG_WEST)
-                                    set_cell_layers(unpacked_blocks, gx, gy, layers)
-                                    set_cell_layers(unpacked_blocks, gx + 1, gy, n_layers)
-                                    stats["cliffs_sealed"] += 1
+                                # Seal cliff passage: only block movement FROM the higher layer towards the lower layer.
+                                # Never seal the lower layer (preserves ground-level walkability through arches/doorways).
+                                if h > nh:
+                                    if nswe & FLAG_EAST:
+                                        layers[i] = (h, nswe & ~FLAG_EAST)
+                                        set_cell_layers(unpacked_blocks, gx, gy, layers)
+                                        stats["cliffs_sealed"] += 1
+                                elif nh > h:
+                                    if nnswe & FLAG_WEST:
+                                        n_layers[match_idx] = (nh, nnswe & ~FLAG_WEST)
+                                        set_cell_layers(unpacked_blocks, gx + 1, gy, n_layers)
+                                        stats["cliffs_sealed"] += 1
                             elif diff <= 32:
                                 # Ensure bidirectional walkability
                                 if bool(nswe & FLAG_EAST) != bool(nnswe & FLAG_WEST):
@@ -257,12 +268,16 @@ class GeoDiagnosticEngine:
                             nh, nnswe = n_layers[match_idx]
                             diff = abs(h - nh)
                             if diff > self.cliff_threshold:
-                                if (nswe & FLAG_SOUTH) or (nnswe & FLAG_NORTH):
-                                    layers[i] = (h, nswe & ~FLAG_SOUTH)
-                                    n_layers[match_idx] = (nh, nnswe & ~FLAG_NORTH)
-                                    set_cell_layers(unpacked_blocks, gx, gy, layers)
-                                    set_cell_layers(unpacked_blocks, gx, gy + 1, n_layers)
-                                    stats["cliffs_sealed"] += 1
+                                if h > nh:
+                                    if nswe & FLAG_SOUTH:
+                                        layers[i] = (h, nswe & ~FLAG_SOUTH)
+                                        set_cell_layers(unpacked_blocks, gx, gy, layers)
+                                        stats["cliffs_sealed"] += 1
+                                elif nh > h:
+                                    if nnswe & FLAG_NORTH:
+                                        n_layers[match_idx] = (nh, nnswe & ~FLAG_NORTH)
+                                        set_cell_layers(unpacked_blocks, gx, gy + 1, n_layers)
+                                        stats["cliffs_sealed"] += 1
                             elif diff <= 32:
                                 if bool(nswe & FLAG_SOUTH) != bool(nnswe & FLAG_NORTH):
                                     layers[i] = (h, nswe | FLAG_SOUTH)

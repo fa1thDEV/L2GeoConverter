@@ -80,9 +80,22 @@ class L2GeoConverterGUI:
         except Exception:
             pass
 
+        self.stop_event = threading.Event()
+        self.is_running = False
+        self._action_buttons = []
+        self._stop_buttons = []
+
         self._init_header()
         self._init_tabs()
         self._init_console()
+
+        self._action_buttons = [
+            self.btn_run_conv,
+            self.btn_run_diag,
+            self.btn_run_gen,
+            self.btn_run_diff,
+            self.btn_run_spawn
+        ]
 
         # Redirect standard output to console log
         self.redirector = TextRedirector(self.console, self.root)
@@ -91,6 +104,40 @@ class L2GeoConverterGUI:
 
         print("L2 Geodata Converter initialized.")
         print("Ready. Select a tab above to begin.")
+
+    def _set_running(self, running: bool, task_name: str = ""):
+        self.is_running = running
+        if running:
+            self.stop_event.clear()
+            self.status_var.set(f"● Running ({task_name})...")
+            self.lbl_status.config(fg="#e5c07b")
+            self.btn_stop.config(state="normal", bg="#e06c75")
+            for b in self._stop_buttons:
+                b.config(state="normal", bg="#e06c75")
+            for b in self._action_buttons:
+                b.config(state="disabled")
+        else:
+            self.stop_event.clear()
+            self.status_var.set("● Ready")
+            self.lbl_status.config(fg="#98c379")
+            self.btn_stop.config(state="disabled", bg="#5c6370")
+            for b in self._stop_buttons:
+                b.config(state="disabled", bg="#5c6370")
+            for b in self._action_buttons:
+                b.config(state="normal")
+
+    def _request_stop(self):
+        if self.is_running:
+            self.stop_event.set()
+            self.status_var.set("● Stopping...")
+            self.lbl_status.config(fg="#e06c75")
+            self.btn_stop.config(state="disabled", bg="#5c6370")
+            for b in self._stop_buttons:
+                b.config(state="disabled", bg="#5c6370")
+            print("\n[STOP] Stop requested by user. Finishing current step and aborting...")
+
+    def _clear_console(self):
+        self.console.delete("1.0", "end")
 
     def _init_header(self):
         header_frame = Frame(self.root, bg="#1a1e24", pady=10)
@@ -214,15 +261,28 @@ class L2GeoConverterGUI:
         btn_out = ttk.Button(out_frame, text="Browse...", command=self._browse_conv_out)
         btn_out.pack(side="left")
 
-        # Action Button
+        # Action Buttons
+        btn_box = Frame(f)
+        btn_box.pack(fill="x", pady=4)
+
         self.btn_run_conv = Button(
-            f, text="START CONVERSION / НАЧАТЬ КОНВЕРТАЦИЮ",
+            btn_box, text="START CONVERSION / НАЧАТЬ КОНВЕРТАЦИЮ",
             font=("Segoe UI", 10, "bold"),
             bg="#28a745", fg="white", activebackground="#218838", activeforeground="white",
             relief="raised", padx=12, pady=6, cursor="hand2",
             command=self._execute_conversion
         )
-        self.btn_run_conv.pack(fill="x", pady=4)
+        self.btn_run_conv.pack(side="left", fill="x", expand=True, padx=(0, 4))
+
+        btn_stop_conv = Button(
+            btn_box, text="■ STOP / СТОП",
+            font=("Segoe UI", 10, "bold"),
+            bg="#5c6370", fg="white", activebackground="#e06c75", activeforeground="white",
+            state="disabled", relief="raised", padx=14, pady=6, cursor="hand2",
+            command=self._request_stop
+        )
+        btn_stop_conv.pack(side="right")
+        self._stop_buttons.append(btn_stop_conv)
 
     def _browse_conv_file(self):
         f = filedialog.askopenfilename(
@@ -258,7 +318,7 @@ class L2GeoConverterGUI:
             dst = os.path.join(os.path.dirname(src) if os.path.isfile(src) else src, "converted")
             self.conv_dst_var.set(dst)
 
-        self.btn_run_conv.config(state="disabled")
+        self._set_running(True, "Conversion")
 
         def worker():
             try:
@@ -270,6 +330,9 @@ class L2GeoConverterGUI:
 
                 success = 0
                 for f in sorted(files):
+                    if self.stop_event.is_set():
+                        print(f"\n[CONVERTER] Conversion cancelled by user ({success}/{len(files)} files completed).")
+                        break
                     fname = os.path.basename(f)
                     base_name = os.path.splitext(fname)[0].replace('_conv', '')
                     in_fmt = sniff_format(fname)
@@ -318,13 +381,16 @@ class L2GeoConverterGUI:
                     print(f"  ✓ Converted: {fname} -> {os.path.basename(out_path)}")
                     success += 1
 
-                print(f"\n[CONVERTER] Finished! {success} files converted successfully to: {dst}\n")
-                self.root.after(0, lambda: messagebox.showinfo("Success", f"Conversion completed!\n{success} files saved in:\n{dst}"))
+                if self.stop_event.is_set():
+                    self.root.after(0, lambda: messagebox.showwarning("Cancelled", f"Conversion stopped by user.\n{success} files saved in:\n{dst}"))
+                else:
+                    print(f"\n[CONVERTER] Finished! {success} files converted successfully to: {dst}\n")
+                    self.root.after(0, lambda: messagebox.showinfo("Success", f"Conversion completed!\n{success} files saved in:\n{dst}"))
             except Exception as e:
                 print(f"[ERROR] Conversion failed: {e}")
                 self.root.after(0, lambda: messagebox.showerror("Error", f"Conversion error:\n{e}"))
             finally:
-                self.root.after(0, lambda: self.btn_run_conv.config(state="normal"))
+                self.root.after(0, lambda: self._set_running(False))
 
         threading.Thread(target=worker, daemon=True).start()
 
@@ -371,15 +437,28 @@ class L2GeoConverterGUI:
         btn_out = ttk.Button(out_frame, text="Browse...", command=self._browse_diag_out)
         btn_out.pack(side="left")
 
-        # Action Button
+        # Action Buttons
+        btn_box = Frame(f)
+        btn_box.pack(fill="x", pady=4)
+
         self.btn_run_diag = Button(
-            f, text="RUN DIAGNOSTICS & REPAIR / ЗАПУСТИТЬ ПРОВЕРКУ И РЕМОНТ",
+            btn_box, text="RUN DIAGNOSTICS & REPAIR / ЗАПУСТИТЬ ПРОВЕРКУ И РЕМОНТ",
             font=("Segoe UI", 10, "bold"),
             bg="#007acc", fg="white", activebackground="#005999", activeforeground="white",
             relief="raised", padx=12, pady=6, cursor="hand2",
             command=self._execute_diagnostics
         )
-        self.btn_run_diag.pack(fill="x", pady=4)
+        self.btn_run_diag.pack(side="left", fill="x", expand=True, padx=(0, 4))
+
+        btn_stop_diag = Button(
+            btn_box, text="■ STOP / СТОП",
+            font=("Segoe UI", 10, "bold"),
+            bg="#5c6370", fg="white", activebackground="#e06c75", activeforeground="white",
+            state="disabled", relief="raised", padx=14, pady=6, cursor="hand2",
+            command=self._request_stop
+        )
+        btn_stop_diag.pack(side="right")
+        self._stop_buttons.append(btn_stop_diag)
 
     def _browse_diag_file(self):
         f = filedialog.askopenfilename(
@@ -412,7 +491,7 @@ class L2GeoConverterGUI:
             messagebox.showerror("Error", "Please select a valid geodata file or folder.")
             return
 
-        self.btn_run_diag.config(state="disabled")
+        self._set_running(True, "Diagnostics")
 
         def worker():
             try:
@@ -428,7 +507,15 @@ class L2GeoConverterGUI:
                 total_fixed_walls = 0
 
                 for f in sorted(files):
-                    rep = engine.analyze(f)
+                    if self.stop_event.is_set():
+                        print("\n[DIAGNOSTICS] Analysis stopped by user.")
+                        break
+
+                    rep = engine.analyze(f, stop_event=self.stop_event)
+                    if self.stop_event.is_set():
+                        print("\n[DIAGNOSTICS] Analysis stopped by user.")
+                        break
+
                     st = rep["stats"]
                     total_cliffs += st["cliff_errors"]
                     total_asym += st["asymmetry_errors"]
@@ -439,34 +526,41 @@ class L2GeoConverterGUI:
                     print(f"    • Layer Squeeze Traps: {st['layer_squeeze_errors']}")
 
                     if do_fix:
+                        if self.stop_event.is_set():
+                            print("\n[DIAGNOSTICS] Repair stopped by user.")
+                            break
                         os.makedirs(dst, exist_ok=True)
                         fixed_file = os.path.join(dst, os.path.basename(f))
-                        res = engine.repair_and_save(f, fixed_file)
-                        total_fixed_cliffs += res["cliffs_sealed"]
-                        total_fixed_walls += res["asymmetries_repaired"]
-                        print(f"    ✓ Auto-repaired & saved -> {fixed_file}")
+                        res = engine.repair_and_save(f, fixed_file, stop_event=self.stop_event)
+                        total_fixed_cliffs += res.get("cliffs_sealed", 0)
+                        total_fixed_walls += res.get("asymmetries_repaired", 0)
+                        if not res.get("stopped", False):
+                            print(f"    ✓ Auto-repaired & saved -> {fixed_file}")
 
-                summary_msg = (
-                    f"Diagnostics Completed!\n\n"
-                    f"• Dangerous Cliff Falls: {total_cliffs}\n"
-                    f"• Asymmetric Walls: {total_asym}\n"
-                )
-                if do_fix:
-                    summary_msg += (
-                        f"\nRepair Results:\n"
-                        f"✓ Cliffs Sealed: {total_fixed_cliffs}\n"
-                        f"✓ Walls Fixed: {total_fixed_walls}\n"
-                        f"Saved in: {dst}"
+                if self.stop_event.is_set():
+                    self.root.after(0, lambda: messagebox.showwarning("Cancelled", "Diagnostics stopped by user."))
+                else:
+                    summary_msg = (
+                        f"Diagnostics Completed!\n\n"
+                        f"• Dangerous Cliff Falls: {total_cliffs}\n"
+                        f"• Asymmetric Walls: {total_asym}\n"
                     )
+                    if do_fix:
+                        summary_msg += (
+                            f"\nRepair Results:\n"
+                            f"✓ Cliffs Sealed: {total_fixed_cliffs}\n"
+                            f"✓ Walls Fixed: {total_fixed_walls}\n"
+                            f"Saved in: {dst}"
+                        )
 
-                print("\n[DIAGNOSTICS] Summary:")
-                print(summary_msg)
-                self.root.after(0, lambda: messagebox.showinfo("Diagnosis Complete", summary_msg))
+                    print("\n[DIAGNOSTICS] Summary:")
+                    print(summary_msg)
+                    self.root.after(0, lambda: messagebox.showinfo("Diagnosis Complete", summary_msg))
             except Exception as e:
                 print(f"[ERROR] Diagnostics failed: {e}")
                 self.root.after(0, lambda: messagebox.showerror("Error", f"Diagnosis error:\n{e}"))
             finally:
-                self.root.after(0, lambda: self.btn_run_diag.config(state="normal"))
+                self.root.after(0, lambda: self._set_running(False))
 
         threading.Thread(target=worker, daemon=True).start()
 
@@ -530,15 +624,28 @@ class L2GeoConverterGUI:
         btn_out = ttk.Button(out_frame, text="Browse...", command=self._browse_gen_out)
         btn_out.pack(side="left")
 
-        # Action Button
+        # Action Buttons
+        btn_box = Frame(f)
+        btn_box.pack(fill="x", pady=4)
+
         self.btn_run_gen = Button(
-            f, text="GENERATE GEODATA / СГЕНЕРИРОВАТЬ ГЕОДАТУ",
+            btn_box, text="GENERATE GEODATA / СГЕНЕРИРОВАТЬ ГЕОДАТУ",
             font=("Segoe UI", 10, "bold"),
             bg="#6f42c1", fg="white", activebackground="#59359a", activeforeground="white",
             relief="raised", padx=12, pady=6, cursor="hand2",
             command=self._execute_generation
         )
-        self.btn_run_gen.pack(fill="x", pady=4)
+        self.btn_run_gen.pack(side="left", fill="x", expand=True, padx=(0, 4))
+
+        btn_stop_gen = Button(
+            btn_box, text="■ STOP / СТОП",
+            font=("Segoe UI", 10, "bold"),
+            bg="#5c6370", fg="white", activebackground="#e06c75", activeforeground="white",
+            state="disabled", relief="raised", padx=14, pady=6, cursor="hand2",
+            command=self._request_stop
+        )
+        btn_stop_gen.pack(side="right")
+        self._stop_buttons.append(btn_stop_gen)
 
     def _browse_gen_unr(self):
         f = filedialog.askopenfilename(
@@ -590,7 +697,7 @@ class L2GeoConverterGUI:
             dst = os.path.join(src, "generated_geodata")
             self.gen_dst_var.set(dst)
 
-        self.btn_run_gen.config(state="disabled")
+        self._set_running(True, "Generation")
 
         def worker():
             try:
@@ -602,29 +709,36 @@ class L2GeoConverterGUI:
                 regions = [region] if region else None
 
                 cmd_generate(
-                    src, dst, regions=regions,
+                    src, dst, maps=regions,
                     terrain_only=terrain_only,
                     out_fmt=internal_fmt,
-                    jobs=None
+                    jobs=None,
+                    stop_event=self.stop_event
                 )
 
-                # If target was Lucera 2 .l2g, encrypt generated .l2j
-                if target_fmt == "l2g":
-                    print("[GENERATOR] Encrypting generated .l2j to Lucera 2 .l2g ...")
-                    for l2j_file in glob.glob(os.path.join(dst, "*.l2j")):
-                        base = os.path.splitext(l2j_file)[0]
-                        l2g_path = base + ".l2g"
-                        l2j2l2g_file(l2j_file, l2g_path)
-                        os.remove(l2j_file)
-                        print(f"  ✓ Encrypted: {os.path.basename(l2g_path)}")
+                if self.stop_event.is_set():
+                    print("\n[GENERATOR] Generation stopped by user.\n")
+                    self.root.after(0, lambda: messagebox.showwarning("Cancelled", "Geodata generation stopped by user."))
+                else:
+                    # If target was Lucera 2 .l2g, encrypt generated .l2j
+                    if target_fmt == "l2g":
+                        print("[GENERATOR] Encrypting generated .l2j to Lucera 2 .l2g ...")
+                        for l2j_file in glob.glob(os.path.join(dst, "*.l2j")):
+                            if self.stop_event.is_set():
+                                break
+                            base = os.path.splitext(l2j_file)[0]
+                            l2g_path = base + ".l2g"
+                            l2j2l2g_file(l2j_file, l2g_path)
+                            os.remove(l2j_file)
+                            print(f"  ✓ Encrypted: {os.path.basename(l2g_path)}")
 
-                print(f"\n[GENERATOR] Generation finished! Output saved in: {dst}\n")
-                self.root.after(0, lambda: messagebox.showinfo("Complete", f"Geodata generation completed!\nFiles saved in:\n{dst}"))
+                    print(f"\n[GENERATOR] Generation finished! Output saved in: {dst}\n")
+                    self.root.after(0, lambda: messagebox.showinfo("Complete", f"Geodata generation completed!\nFiles saved in:\n{dst}"))
             except Exception as e:
                 print(f"[ERROR] Generation failed: {e}")
                 self.root.after(0, lambda: messagebox.showerror("Error", f"Generation error:\n{e}"))
             finally:
-                self.root.after(0, lambda: self.btn_run_gen.config(state="normal"))
+                self.root.after(0, lambda: self._set_running(False))
 
         threading.Thread(target=worker, daemon=True).start()
 
@@ -673,15 +787,28 @@ class L2GeoConverterGUI:
         )
         Label(info_box, text=desc, justify="left", font=("Segoe UI", 9), fg="#333333").pack(anchor="w")
 
-        # Button
+        # Action Buttons
+        btn_box = Frame(f)
+        btn_box.pack(fill="x", pady=6)
+
         self.btn_run_diff = Button(
-            f, text="RUN PACK COMPARISON / СРАВНИТЬ ПАКИ",
+            btn_box, text="RUN PACK COMPARISON / СРАВНИТЬ ПАКИ",
             font=("Segoe UI", 10, "bold"),
             bg="#d39e00", fg="black", activebackground="#b98800", activeforeground="black",
             relief="raised", padx=12, pady=6, cursor="hand2",
             command=self._execute_diff
         )
-        self.btn_run_diff.pack(fill="x", pady=6)
+        self.btn_run_diff.pack(side="left", fill="x", expand=True, padx=(0, 4))
+
+        btn_stop_diff = Button(
+            btn_box, text="■ STOP / СТОП",
+            font=("Segoe UI", 10, "bold"),
+            bg="#5c6370", fg="white", activebackground="#e06c75", activeforeground="white",
+            state="disabled", relief="raised", padx=14, pady=6, cursor="hand2",
+            command=self._request_stop
+        )
+        btn_stop_diff.pack(side="right")
+        self._stop_buttons.append(btn_stop_diff)
 
     def _browse_diff_a(self):
         d = filedialog.askdirectory(title="Select Geodata Pack A")
@@ -705,21 +832,25 @@ class L2GeoConverterGUI:
             messagebox.showerror("Error", "Please select a valid folder for Pack B.")
             return
 
-        self.btn_run_diff.config(state="disabled")
+        self._set_running(True, "Diff")
 
         def worker():
             try:
                 print(f"\n[DIFF] Comparing Pack A ({da}) vs Pack B ({db}) ...")
                 if reg:
                     print(f"  Focusing on region: {reg}")
-                ret = cmd_diff(da, db, region=reg)
-                print(f"\n[DIFF] Finished with exit code: {ret}\n")
-                self.root.after(0, lambda: messagebox.showinfo("Diff Completed", "Pack comparison finished. Check Live Activity Log for full details."))
+                ret = cmd_diff(da, db, region=reg, stop_event=self.stop_event)
+                if self.stop_event.is_set():
+                    print("\n[DIFF] Comparison stopped by user.\n")
+                    self.root.after(0, lambda: messagebox.showwarning("Cancelled", "Pack comparison stopped by user."))
+                else:
+                    print(f"\n[DIFF] Finished with exit code: {ret}\n")
+                    self.root.after(0, lambda: messagebox.showinfo("Diff Completed", "Pack comparison finished. Check Live Activity Log for full details."))
             except Exception as e:
                 print(f"[ERROR] Diff failed: {e}")
                 self.root.after(0, lambda: messagebox.showerror("Error", f"Diff error:\n{e}"))
             finally:
-                self.root.after(0, lambda: self.btn_run_diff.config(state="normal"))
+                self.root.after(0, lambda: self._set_running(False))
 
         threading.Thread(target=worker, daemon=True).start()
 
@@ -771,15 +902,28 @@ class L2GeoConverterGUI:
         )
         Label(info_box, text=desc, justify="left", font=("Segoe UI", 9), fg="#333333").pack(anchor="w")
 
-        # Button
+        # Action Buttons
+        btn_box = Frame(f)
+        btn_box.pack(fill="x", pady=6)
+
         self.btn_run_spawn = Button(
-            f, text="VALIDATE NPC SPAWNS / ПРОВЕРИТЬ ТОЧКИ СПАВНА",
+            btn_box, text="VALIDATE NPC SPAWNS / ПРОВЕРИТЬ ТОЧКИ СПАВНА",
             font=("Segoe UI", 10, "bold"),
             bg="#20c997", fg="white", activebackground="#1aa179", activeforeground="white",
             relief="raised", padx=12, pady=6, cursor="hand2",
             command=self._execute_spawncheck
         )
-        self.btn_run_spawn.pack(fill="x", pady=6)
+        self.btn_run_spawn.pack(side="left", fill="x", expand=True, padx=(0, 4))
+
+        btn_stop_spawn = Button(
+            btn_box, text="■ STOP / СТОП",
+            font=("Segoe UI", 10, "bold"),
+            bg="#5c6370", fg="white", activebackground="#e06c75", activeforeground="white",
+            state="disabled", relief="raised", padx=14, pady=6, cursor="hand2",
+            command=self._request_stop
+        )
+        btn_stop_spawn.pack(side="right")
+        self._stop_buttons.append(btn_stop_spawn)
 
     def _browse_spawn_geo(self):
         d = filedialog.askdirectory(title="Select Geodata Folder")
@@ -815,22 +959,26 @@ class L2GeoConverterGUI:
             messagebox.showerror("Error", "Please select a valid npcpos.txt file.")
             return
 
-        self.btn_run_spawn.config(state="disabled")
+        self._set_running(True, "SpawnCheck")
 
         def worker():
             try:
                 print(f"\n[SPAWNCHECK] Validating spawns in {npc} against geodata {geo} ...")
-                ret = cmd_spawncheck(geo, npc, out_json=out)
-                print(f"\n[SPAWNCHECK] Validation completed (exit code: {ret})\n")
-                msg = "Spawn check completed! Check the Live Activity Log for warning pins."
-                if out:
-                    msg += f"\nDetailed JSON report saved to:\n{out}"
-                self.root.after(0, lambda: messagebox.showinfo("Validation Finished", msg))
+                ret = cmd_spawncheck(geo, npc, out_json=out, stop_event=self.stop_event)
+                if self.stop_event.is_set():
+                    print("\n[SPAWNCHECK] Validation stopped by user.\n")
+                    self.root.after(0, lambda: messagebox.showwarning("Cancelled", "Spawn validation stopped by user."))
+                else:
+                    print(f"\n[SPAWNCHECK] Validation completed (exit code: {ret})\n")
+                    msg = "Spawn check completed! Check the Live Activity Log for warning pins."
+                    if out:
+                        msg += f"\nDetailed JSON report saved to:\n{out}"
+                    self.root.after(0, lambda: messagebox.showinfo("Validation Finished", msg))
             except Exception as e:
                 print(f"[ERROR] Spawncheck failed: {e}")
                 self.root.after(0, lambda: messagebox.showerror("Error", f"Spawncheck error:\n{e}"))
             finally:
-                self.root.after(0, lambda: self.btn_run_spawn.config(state="normal"))
+                self.root.after(0, lambda: self._set_running(False))
 
         threading.Thread(target=worker, daemon=True).start()
 
@@ -902,8 +1050,34 @@ class L2GeoConverterGUI:
         console_frame = ttk.LabelFrame(self.root, text=" Live Activity & Status Log / Журнал событий ", padding=6)
         console_frame.pack(fill="both", expand=True, padx=10, pady=(0, 10))
 
+        # Activity control toolbar
+        toolbar = Frame(console_frame, bg="#2d3139", pady=3, padx=6)
+        toolbar.pack(fill="x", side="top", pady=(0, 4))
+
+        self.status_var = StringVar(value="● Ready")
+        self.lbl_status = Label(
+            toolbar, textvariable=self.status_var,
+            font=("Segoe UI", 9, "bold"), fg="#98c379", bg="#2d3139"
+        )
+        self.lbl_status.pack(side="left")
+
+        self.btn_stop = Button(
+            toolbar, text="■ STOP / СТОП",
+            font=("Segoe UI", 9, "bold"),
+            bg="#5c6370", fg="white", activebackground="#e06c75", activeforeground="white",
+            state="disabled", relief="flat", padx=10, pady=1, cursor="hand2",
+            command=self._request_stop
+        )
+        self.btn_stop.pack(side="right", padx=(4, 0))
+
+        btn_clear = ttk.Button(toolbar, text="Clear Log", command=self._clear_console)
+        btn_clear.pack(side="right", padx=4)
+
+        text_frame = Frame(console_frame)
+        text_frame.pack(fill="both", expand=True)
+
         self.console = Text(
-            console_frame,
+            text_frame,
             wrap="word",
             bg="#1e1e1e",
             fg="#d4d4d4",
@@ -911,7 +1085,7 @@ class L2GeoConverterGUI:
             font=("Consolas", 9),
             height=9
         )
-        scrollbar = ttk.Scrollbar(console_frame, orient="vertical", command=self.console.yview)
+        scrollbar = ttk.Scrollbar(text_frame, orient="vertical", command=self.console.yview)
         self.console.configure(yscrollcommand=scrollbar.set)
 
         scrollbar.pack(side="right", fill="y")

@@ -57,11 +57,13 @@ class GeoAuditor:
         self.cliff_threshold = cliff_threshold
         self.min_layer_clearance = min_layer_clearance
 
-    def audit(self, region: GeoRegion, sample_limit: int = 200) -> GeoDiagnosticReport:
+    def audit(self, region: GeoRegion, sample_limit: int = 200, stop_event=None) -> GeoDiagnosticReport:
         report = GeoDiagnosticReport(region)
 
         # 1. Audit block level redundancy
         for bx in range(BLOCKS_PER_AXIS):
+            if stop_event and stop_event.is_set():
+                return report
             for by in range(BLOCKS_PER_AXIS):
                 b = region.blocks[bx][by]
                 if b.block_type == BLOCK_COMPLEX:
@@ -82,6 +84,8 @@ class GeoAuditor:
 
         # 2. Audit cell level NSWE symmetry, cliffs, and layers
         for gx in range(CELLS_PER_AXIS):
+            if stop_event and stop_event.is_set():
+                return report
             bx = gx >> 3
             cx = gx & 7
             for gy in range(CELLS_PER_AXIS):
@@ -199,7 +203,7 @@ class GeoRepairer:
         self.max_walkable_step = max_walkable_step
         self.max_cliff_step = max_cliff_step
 
-    def repair(self, region: GeoRegion) -> Dict[str, int]:
+    def repair(self, region: GeoRegion, stop_event=None) -> Dict[str, int]:
         """Repairs all common geodata glitches in the region."""
         stats = {
             "cliffs_blocked": 0,
@@ -213,6 +217,9 @@ class GeoRepairer:
 
         # 2. Convert blocks to complex if we need to modify individual cell NSWE
         for gx in range(CELLS_PER_AXIS):
+            if stop_event and stop_event.is_set():
+                stats["stopped"] = True
+                return stats
             bx = gx >> 3
             cx = gx & 7
             for gy in range(CELLS_PER_AXIS):
@@ -245,14 +252,18 @@ class GeoRepairer:
                         if not l2: continue
                         h_diff = abs(l1.z - l2.z)
 
-                        # If height difference is too steep, block passage in both directions
+                        # If height difference is too steep, block passage only on the higher layer towards the lower layer
                         if h_diff > self.max_cliff_step:
-                            if (l1.nswe & FLAG_EAST) or (l2.nswe & FLAG_WEST):
-                                block.to_complex()
-                                n_block.to_complex()
-                                l1.nswe &= ~FLAG_EAST
-                                l2.nswe &= ~FLAG_WEST
-                                stats["cliffs_blocked"] += 1
+                            if l1.z > l2.z:
+                                if l1.nswe & FLAG_EAST:
+                                    block.to_complex()
+                                    l1.nswe &= ~FLAG_EAST
+                                    stats["cliffs_blocked"] += 1
+                            elif l2.z > l1.z:
+                                if l2.nswe & FLAG_WEST:
+                                    n_block.to_complex()
+                                    l2.nswe &= ~FLAG_WEST
+                                    stats["cliffs_blocked"] += 1
 
                         # If height difference is walkable, ensure symmetry
                         elif h_diff <= self.max_walkable_step:
@@ -279,12 +290,16 @@ class GeoRepairer:
                         h_diff = abs(l1.z - l2.z)
 
                         if h_diff > self.max_cliff_step:
-                            if (l1.nswe & FLAG_SOUTH) or (l2.nswe & FLAG_NORTH):
-                                block.to_complex()
-                                n_block.to_complex()
-                                l1.nswe &= ~FLAG_SOUTH
-                                l2.nswe &= ~FLAG_NORTH
-                                stats["cliffs_blocked"] += 1
+                            if l1.z > l2.z:
+                                if l1.nswe & FLAG_SOUTH:
+                                    block.to_complex()
+                                    l1.nswe &= ~FLAG_SOUTH
+                                    stats["cliffs_blocked"] += 1
+                            elif l2.z > l1.z:
+                                if l2.nswe & FLAG_NORTH:
+                                    n_block.to_complex()
+                                    l2.nswe &= ~FLAG_NORTH
+                                    stats["cliffs_blocked"] += 1
                         elif h_diff <= self.max_walkable_step:
                             if bool(l1.nswe & FLAG_SOUTH) != bool(l2.nswe & FLAG_NORTH):
                                 block.to_complex()

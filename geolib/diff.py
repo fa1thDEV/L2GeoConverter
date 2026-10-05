@@ -189,7 +189,7 @@ def _detail(region, fa, fb, name_a, name_b):
     return 0
 
 
-def cmd_diff(dir_a, dir_b, region=None):
+def cmd_diff(dir_a, dir_b, region=None, stop_event=None):
     fa_all, fb_all = region_files(dir_a), region_files(dir_b)
     if not fa_all or not fb_all:
         print(red('  ✗ one of the folders has no geodata files (*.l2j / *_conv.dat named from XX_YY).'))
@@ -211,6 +211,9 @@ def cmd_diff(dir_a, dir_b, region=None):
     sample = set(rnd.sample(range(BLOCKS), SAMPLE_BLOCKS))
     rows = []
     for i, r in enumerate(common, 1):
+        if stop_event and stop_event.is_set():
+            print("\n  [DIFF] Comparison stopped by user.")
+            return 0
         try:
             ha = sampled_surface(fa_all[r], sample)
         except (GeoError, struct.error, IndexError, ValueError):

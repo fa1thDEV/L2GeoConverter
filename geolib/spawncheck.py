@@ -397,7 +397,7 @@ def _pin(name, region, wx, wy, geo_z, zmin, zmax, delta, side, bucket, verts=Non
     }
 
 
-def cmd_spawncheck(geodir, npcpos, out_json=None):
+def cmd_spawncheck(geodir, npcpos, out_json=None, stop_event=None):
     """Check every npcpos spawn against PTS/L2J geodata. Does not edit npcpos."""
     if not os.path.isdir(geodir):
         print(red(f'  ✗ geodata folder not found: {geodir}'))
@@ -435,6 +435,9 @@ def cmd_spawncheck(geodir, npcpos, out_json=None):
     uniq.sort(key=lambda p: world_region(p['x'], p['y']))
     n = len(uniq)
     for i, p in enumerate(uniq, 1):
+        if stop_event and stop_event.is_set():
+            print("\n  [SPAWNCHECK] Validation stopped by user.")
+            return 0
         rx, ry = world_region(p['x'], p['y'])
         region = f'{rx}_{ry}'
         geo = geo_for(rx, ry)

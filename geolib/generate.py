@@ -1450,7 +1450,8 @@ def want_worker_delta(n_active, pending, avail_gb, min_free=MIN_FREE_RAM_GB,
 
 def cmd_generate(client_dir, out_dir, maps=None, max_step=UP_STEP,
                  terrain_only=False, jobs=None, out_fmt='l2j', protocol=PROTO_GD,
-                 doordata=None, min_free_ram=MIN_FREE_RAM_GB, max_cpu=MAX_CPU_PCT):
+                 doordata=None, min_free_ram=MIN_FREE_RAM_GB, max_cpu=MAX_CPU_PCT,
+                 stop_event=None):
     """Generate from the client: each Maps map as-is → out/<name>.l2j
     (or out/<name>_conv.dat when out_fmt='pts').
 
@@ -1546,6 +1547,10 @@ def cmd_generate(client_dir, out_dir, maps=None, max_step=UP_STEP,
         # blocks): you see how much is left until the square finishes, not only 0→100%.
         try:
             for i, (cl, name, out_path, ms, terr, fmt, proto, doors) in enumerate(tasks, 1):
+                if stop_event and stop_event.is_set():
+                    aborted = True
+                    print(dim(f'\n  generation stopped at {done}/{total} — {ok} completed files kept.'))
+                    break
                 def cb(d, t, _n=name):
                     progress(d, t, _n)               # bar_line will align the label
                 tmp = out_path + '.tmp'
@@ -1611,6 +1616,12 @@ def cmd_generate(client_dir, out_dir, maps=None, max_step=UP_STEP,
             asyncs = [pool.apply_async(_worker, (job,)) for job in tasks]
             try:
                 while True:
+                    if stop_event and stop_event.is_set():
+                        aborted = True
+                        pool.terminate()
+                        bars.stop()
+                        print(dim(f'\n  generation stopped at {done}/{total} — {ok} completed files kept.'))
+                        break
                     _drain_progress(pq, active)
                     completed = sum(1 for a in asyncs if a.ready())
                     _status(completed)
@@ -1646,6 +1657,13 @@ def cmd_generate(client_dir, out_dir, maps=None, max_step=UP_STEP,
             live_ids = set()
             try:
                 while pending or live:
+                    if stop_event and stop_event.is_set():
+                        aborted = True
+                        for rec in live:
+                            rec['proc'].terminate()
+                        bars.stop()
+                        print(dim(f'\n  generation stopped at {done}/{total} — {ok} completed files kept.'))
+                        break
                     _drain_progress(pq, active)
                     dead = []
                     still = []
