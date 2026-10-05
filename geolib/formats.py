@@ -191,6 +191,9 @@ class L2GCodec:
 
         return struct.pack('<i', enc_key) + bytes(enc_data)
 
+    encode = encrypt
+    decode = decrypt
+
 
 def sniff_format(path):
     """'l2j' | 'l2g' | 'pts' | None from name and contents."""

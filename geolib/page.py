@@ -788,5 +788,18 @@ $('cv3').addEventListener('mousemove',e=>{if(!drag3||!MODE3)return;
  yaw+=(e.clientX-lx3)*0.01; pitch=Math.max(.08,Math.min(1.45,pitch+(e.clientY-ly3)*0.01));
  lx3=e.clientX;ly3=e.clientY;draw3d();});
 $('cv3').addEventListener('wheel',e=>{if(!MODE3)return;e.preventDefault();
- dist=Math.max(.4,Math.min(6,dist*(e.deltaY>0?1.12:.89)));draw3d();},{passive:false});
+ dist=Math.max(.2,Math.min(8,dist*(e.deltaY>0?1.12:.89)));draw3d();},{passive:false});
+window.addEventListener('keydown',e=>{
+ if(!MODE3)return;
+ const k=e.key.toLowerCase();
+ let moved=false;
+ if(k==='w'){dist=Math.max(.2,dist*0.92);moved=true;}
+ else if(k==='s'){dist=Math.min(8.0,dist*1.08);moved=true;}
+ else if(k==='a'){yaw-=0.05;moved=true;}
+ else if(k==='d'){yaw+=0.05;moved=true;}
+ else if(k==='q'){pitch=Math.min(1.45,pitch+0.04);moved=true;}
+ else if(k==='e'){pitch=Math.max(0.08,pitch-0.04);moved=true;}
+ else if(k==='r'){yaw=0.7;pitch=0.55;dist=2.4;moved=true;}
+ if(moved){e.preventDefault();draw3d();}
+});
 </script></body></html>'''
