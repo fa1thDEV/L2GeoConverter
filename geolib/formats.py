@@ -216,7 +216,8 @@ def parse_region(path, fmt=None):
     """File -> list of 65536 blocks; block = list of 64 cells;
     cell = list of layers (h, nswe). Format is detected automatically."""
     fmt = fmt or sniff_format(path)
-    data = open(path, 'rb').read()
+    with open(path, 'rb') as f:
+        data = f.read()
     if fmt == 'l2g':
         data = L2GCodec.decrypt(data)
         fmt = 'l2j'

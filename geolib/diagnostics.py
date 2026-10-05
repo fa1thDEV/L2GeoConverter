@@ -22,6 +22,7 @@ from .convert import l2j2pts_bytes
 from .ui import bold, cyan, dim, green, red, yellow, progress
 
 # Movement flags
+FLAG_NONE  = 0x00
 FLAG_EAST  = 0x01
 FLAG_WEST  = 0x02
 FLAG_SOUTH = 0x04
@@ -292,14 +293,18 @@ class GeoDiagnosticEngine:
 
         if out_fmt == 'l2g':
             enc = L2GCodec.encrypt(l2j_bytes)
-            open(dst_path, 'wb').write(enc)
+            with open(dst_path, 'wb') as f:
+                f.write(enc)
         elif out_fmt == 'l2j':
-            open(dst_path, 'wb').write(l2j_bytes)
+            with open(dst_path, 'wb') as f:
+                f.write(l2j_bytes)
         elif out_fmt == 'pts':
             pts_bytes, _, _, _ = l2j2pts_bytes(l2j_bytes, rx, ry, PROTO_GD)
-            open(dst_path, 'wb').write(pts_bytes)
+            with open(dst_path, 'wb') as f:
+                f.write(pts_bytes)
         else:
-            open(dst_path, 'wb').write(l2j_bytes)
+            with open(dst_path, 'wb') as f:
+                f.write(l2j_bytes)
 
         return stats
 
