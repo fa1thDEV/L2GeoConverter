@@ -1,10 +1,14 @@
+<p align="center">
+  <img src="assets/logo.png" alt="L2 Geodata Converter" width="560">
+</p>
+
 # L2GeoConverter
 
 Lineage 2 geodata conversion, validation and client map generation toolkit.
 
 Supports Lucera 2 (`.l2g`), standard Java emulators (`.l2j`), and official PTS/L2Off binary files (`_conv.dat`).
 
-[Releases](https://github.com/fa1thDEV/L2GeoConverter/releases/latest) | [Russian documentation](README_RU.md)
+[Releases](https://github.com/fa1thDEV/L2GeoConverter/releases/latest) | [Visual Guide & Mechanics](docs/GUIDE.md) | [Manual en Español](docs/MANUAL-GEOCONVERTER_ES.md) | [Russian documentation](README_RU.md)
 
 ---
 
@@ -65,6 +69,58 @@ python geotool.py generate path/to/client/ -o ./output --region 20_20
 ```
 
 On Windows, `GeoConverter.bat` is provided as a shortcut for drag-and-drop file processing and quick tasks.
+
+---
+
+## Visual Guide & Geodata Mechanics
+
+### 1. NSWE Directional Flags & Creating Invisible Barriers
+
+In Lineage 2 geodata, each cell (16x16 world units) stores an elevation ($Z$) and a 4-bit bitmask determining which neighboring cells a character can move into:
+
+| Bit | Flag | Direction | Hex Value | Description |
+|---|---|---|---|---|
+| bit 0 | `FLAG_EAST` | +X | `0x01` | Allows step East |
+| bit 1 | `FLAG_WEST` | -X | `0x02` | Allows step West |
+| bit 2 | `FLAG_SOUTH` | +Y | `0x04` | Allows step South |
+| bit 3 | `FLAG_NORTH` | -Y | `0x08` | Allows step North |
+| bits 0-3 | `FLAG_ALL` | Any | `0x0F` | Completely open ground |
+| 0 bits | `FLAG_NONE` | None | `0x00` | Solid obstacle / pillar |
+
+<p align="center">
+  <img src="docs/images/02_invisible_barriers.png" alt="NSWE Flags & Invisible Barriers" width="900">
+</p>
+
+#### How to construct an Invisible Wall
+1. **Directional Boundary Wall**: Leave the elevation $Z$ of both cells identical (e.g., $Z=100$), but strip the crossing bitmask:
+   - On Cell A $(gx, gy)$: `nswe &= ~FLAG_EAST` (`0x01`).
+   - On Cell B $(gx+1, gy)$: `nswe &= ~FLAG_WEST` (`0x02`).
+   The player's client renders open, flat terrain, but the server collision matrix rejects movement packets attempting to cross the boundary.
+2. **Solid Column**: Set the target cell's bitmask to `0x00` (`FLAG_NONE`). Characters cannot enter this 16x16 coordinate column from any angle.
+3. **One-Way Traps (`NSWE_ASYMMETRY`)**: If Cell A allows East movement but Cell B forbids West return, a player walking into Cell B becomes permanently stuck. The diagnostic engine scans for this asymmetry and can restore bidirectional passage with `--fix`.
+
+---
+
+### 2. Cliff Drops & Archway Preservation (Giran Fix)
+
+<p align="center">
+  <img src="docs/images/03_cliff_repair.png" alt="Cliff Falls & Archways" width="900">
+</p>
+
+* **Hazardous Cliff Drops (`CLIFF_FALL`)**: When adjacent cells differ in elevation by $|\Delta Z| > 48$ with an open passage flag toward the drop, players fall off cliffs and clip through the terrain into the ocean. The repair engine strips the drop flag on the upper cell.
+* **Archway Doorway Preservation**: In city portals and arches (e.g., Giran, Dion), the arch cell has multiple layers (ground $Z=96$, arch roof $Z=384$) adjacent to an outdoor street cell ($Z=96$). Naive repair algorithms that block both cells unintentionally strip the outdoor ground flag and brick the gate. L2GeoConverter applies cliff blocking **strictly to the higher layer towards the drop**, preserving 100% ground walkability through doorways.
+
+---
+
+### 3. Block Structure & Vertical Clearance
+
+<p align="center">
+  <img src="docs/images/04_block_types.png" alt="Block Types & Multilayer Clearance" width="900">
+</p>
+
+* **Type 0 (Flat)**: Single $Z$ coordinate for all 64 cells in the block. Encoded in 2 bytes.
+* **Type 1 (Complex)**: 64 independent cells, each with individual $Z$ and 4-bit NSWE.
+* **Type 2 (Multilayer)**: Variable number of layers per cell (bridges, castles, multi-floor dungeons). Consecutive layers must maintain at least 32 units of vertical clearance to prevent camera clipping and character rubberbanding.
 
 ---
 

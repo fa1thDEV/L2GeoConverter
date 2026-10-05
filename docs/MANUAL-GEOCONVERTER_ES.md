@@ -174,7 +174,62 @@ apply_geo_patch_json(region, patch_spec)
 
 ---
 
-## 4. Detalles Técnicos del Codec Lucera 2 (`.l2g`)
+## 4. Guía Visual: Creación de Barreras Invisibles y Diagnóstico
+
+### A. Estructura NSWE y Creación de Barreras Invisibles
+
+Cada celda de geodata ($16 \times 16$ unidades de mundo) almacena su cota $Z$ y una máscara de 4 bits que define el paso hacia los vecinos:
+
+| Bit | Flag | Dirección | Hex | Función |
+|---|---|---|---|---|
+| bit 0 | `FLAG_EAST` | $+X$ (Este) | `0x01` | Permite avanzar hacia el Este |
+| bit 1 | `FLAG_WEST` | $-X$ (Oeste) | `0x02` | Permite avanzar hacia el Oeste |
+| bit 2 | `FLAG_SOUTH` | $+Y$ (Sur) | `0x04` | Permite avanzar hacia el Sur |
+| bit 3 | `FLAG_NORTH` | $-Y$ (Norte) | `0x08` | Permite avanzar hacia el Norte |
+| bits 0-3 | `FLAG_ALL` | Todas | `0x0F` | Suelo completamente abierto y transitable |
+| 0 bits | `FLAG_NONE` | Ninguna | `0x00` | Obstáculo sólido / columna infranqueable |
+
+<p align="center">
+  <img src="images/02_invisible_barriers.png" alt="Banderas NSWE y Barreras Invisibles" width="900">
+</p>
+
+#### Pasos para Crear una Pared Invisible:
+1. **Pared Direccional (Suelo plano)**:
+   - Se mantienen ambas celdas a la misma altura ($Z=100$).
+   - En la celda izquierda $(gx, gy)$: se retira el flag Este: `nswe &= ~0x01`.
+   - En la celda derecha $(gx+1, gy)$: se retira el flag Oeste: `nswe &= ~0x02`.
+   - El cliente de juego dibuja el suelo normal y abierto, pero el motor de colisiones del servidor rechaza cualquier paquete de movimiento que intente cruzar el límite.
+2. **Columna / Bloque Sólido**:
+   - Asignar `nswe = 0x00` a la celda completa. Ningún personaje puede entrar desde ningún ángulo.
+3. **Paredes Trampa Unidireccionales (`NSWE_ASYMMETRY`)**:
+   - Ocurre cuando una celda permite ir al Este, pero la contigua prohíbe volver al Oeste. El jugador entra pero queda atrapado. La herramienta detecta estas asimetrías y las repara con `--fix`.
+
+---
+
+### B. Detección de Caídas y Preservación de Arcos y Puertas (Fix de Girán)
+
+<p align="center">
+  <img src="images/03_cliff_repair.png" alt="Precipicios y Arcos de Ciudad" width="900">
+</p>
+
+* **Precipicios Fatales (`CLIFF_FALL`)**: Cuando entre dos celdas adyacentes existe un desnivel $|\Delta Z| > 48$ con bandera de paso abierta hacia el vacío, los jugadores caen debajo del mapa. El reparador sella el flag en la celda superior.
+* **Preservación de Puertas y Arcos**: En portales de ciudades (como los arcos de Giran o Dion), la celda del arco tiene suelo ($Z=96$) y techo ($Z=384$), mientras que la celda exterior sólo tiene suelo ($Z=96$). Al comparar capas cercanas, el algoritmo antiguo borraba el flag de paso de **ambas** celdas, sellando la puerta. `L2GeoConverter` aplica el bloqueo **exclusivamente a la capa superior en dirección al vacío**, manteniendo el tránsito a ras de suelo $100\%$ transitable.
+
+---
+
+### C. Tipos de Bloque y Holgura Vertical
+
+<p align="center">
+  <img src="images/04_block_types.png" alt="Arquitectura de Bloques" width="900">
+</p>
+
+* **Tipo 0 (Flat)**: 1 sola altura para las 64 celdas del bloque. Ocupa 2 bytes.
+* **Tipo 1 (Complex)**: 64 celdas independientes ($Z$ + NSWE). Ocupa 128 bytes.
+* **Tipo 2 (Multilayer)**: Varias capas por celda (puentes, mazmorras, murallas). Las capas sucesivas deben guardar al menos 32 unidades de distancia vertical para evitar que los personajes queden atascados.
+
+---
+
+## 5. Detalles Técnicos del Codec Lucera 2 (`.l2g`)
 
 El servidor Lucera 2 (`l2.gameserver.geodata.GeoEngine`) carga los archivos `.l2g` con el siguiente algoritmo:
 1. Lee los primeros 4 bytes como entero con signo de 32 bits (Little-Endian): `xorKey`.
