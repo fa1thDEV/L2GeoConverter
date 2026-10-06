@@ -16,28 +16,42 @@ except ImportError:  # python built without Tk
 def _display_available():
     if tkinter is None:
         return False
-    if sys.platform.startswith('linux') and not os.environ.get('DISPLAY'):
-        return False
+    return not (sys.platform.startswith('linux') and not os.environ.get('DISPLAY'))
+
+
+def _make_root():
+    """One Tk interpreter per test class. On Windows, Tcl init occasionally
+    fails to read init.tcl ("couldn't read file ...: No error") when
+    interpreters are created back to back, so retry once."""
     try:
-        tkinter.Tk().destroy()
-        return True
+        return tkinter.Tk()
     except tkinter.TclError:
-        return False
+        import time
+        time.sleep(0.5)
+        return tkinter.Tk()
 
 
 @unittest.skipUnless(_display_available(), 'Tkinter or a display is not available')
 class GuiSmokeTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.root = _make_root()
+        cls.root.withdraw()
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.root.destroy()
+
     def setUp(self):
         from geolib.gui import L2GeoConverterGUI
         self._stdout, self._stderr = sys.stdout, sys.stderr
-        self.root = tkinter.Tk()
-        self.root.withdraw()
+        for child in list(self.root.children.values()):
+            child.destroy()
         self.app = L2GeoConverterGUI(self.root)
         self.root.update_idletasks()
 
     def tearDown(self):
         sys.stdout, sys.stderr = self._stdout, self._stderr
-        self.root.destroy()
 
     def test_all_tabs_built(self):
         tabs = self.app.notebook.tabs()
