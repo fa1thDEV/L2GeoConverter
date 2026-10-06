@@ -13,6 +13,7 @@ from geolib.editor import (
 from geolib.diagnostics import (
     GeoDiagnosticEngine, geo_to_world, world_to_geo, get_cell_layers, set_cell_layers
 )
+from tests.support import slow
 
 class TestGeoFormats(unittest.TestCase):
     def test_height_quantization(self):
@@ -67,6 +68,7 @@ class TestGeoEditor(unittest.TestCase):
     def setUp(self):
         self.blocks = [[[(100, 15)]] * 64 for _ in range(65536)]
         
+    @slow
     def test_shift_z_blocks_extreme(self):
         # We need to copy otherwise flat blocks might be shared.
         # setUp creates shared lists.
@@ -76,6 +78,7 @@ class TestGeoEditor(unittest.TestCase):
         shift_z_blocks(self.blocks, -100000)
         self.assertEqual(self.blocks[0][0][0][0], -16384) # clamped min
 
+    @slow
     def test_delete_z_range_blocks(self):
         # Multi-layer cell
         self.blocks[0][0] = [(100, 15), (200, 15), (300, 15)]
@@ -97,6 +100,7 @@ class TestGeoEditor(unittest.TestCase):
         delete_z_range_blocks(self.blocks, -1000, 1000, keep_at_least_one=False)
         self.assertEqual(len(self.blocks[0][0]), 0)
 
+    @slow
     def test_recalculate_slope_flags(self):
         self.blocks[0][0] = [(100, 15)]
         self.blocks[0][1] = [(150, 15)] # delta 50 > max_climb_z (default 24)
@@ -115,6 +119,7 @@ class TestGeoEditor(unittest.TestCase):
         scanner.close()
 
 class TestGeoDiagnostics(unittest.TestCase):
+    @slow
     def test_multi_layer_archway_cliff_resolution(self):
         engine = GeoDiagnosticEngine(cliff_threshold=48, min_clearance=32)
         blocks = [[[(0, 15)]] * 64 for _ in range(65536)]

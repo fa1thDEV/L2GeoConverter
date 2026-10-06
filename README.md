@@ -141,7 +141,24 @@ Lucera 2 wraps standard 65,536-block L2J data in a rolling XOR/subtraction strea
 
 ## Building from source
 
-Requirements: Python 3.8+ (standard library only).
+Requirements: Python 3.8+. The core toolkit uses only the standard library; optional extras:
+
+```bash
+pip install -r requirements.txt        # Pillow: GUI image scaling (Tkinter must be present)
+pip install -r requirements-accel.txt  # Taichi + NumPy: faster `generate` raycasting
+```
+
+### Running the tests
+
+```bash
+pip install -r requirements-dev.txt
+python -m pytest -m "not slow"   # fast loop (~20 s)
+python -m pytest                 # full suite, including heavy full-region tests
+```
+
+Tests that parse a real Lineage 2 client are skipped unless `L2_CLIENT_DIR` (client root with `Maps/`, `Textures/`, `StaticMeshes/`) and `L2_GEODATA_DIR` (server geodata folder) point at one. CI runs lint plus the test suite on Linux and Windows for every push.
+
+### Standalone executable
 
 To build the standalone Windows executable:
 ```bash

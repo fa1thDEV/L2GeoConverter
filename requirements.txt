@@ -1,0 +1,9 @@
+# L2GeoConverter core (CLI, converters, diagnostics, pathnode, viewer) runs on
+# the Python 3.8+ standard library alone. The packages below are optional.
+
+# Desktop GUI: smooth logo / guide image scaling (falls back to Tk PhotoImage).
+# Also required by make_guide_diagrams.py.
+Pillow>=9.1
+
+# Note: the GUI needs Tkinter. It ships with the python.org Windows/macOS
+# installers; on Debian/Ubuntu install it with `apt install python3-tk`.

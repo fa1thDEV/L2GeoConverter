@@ -10,6 +10,7 @@ import unittest
 from geolib.formats import L2GCodec, BLOCKS, dec_h, dec_nswe, enc_cell
 from geolib.convert import l2j2pts_bytes, l2g2l2j_file, l2j2l2g_file, validate_l2j_bytes
 from geolib.diagnostics import GeoDiagnosticEngine, cmd_diagnose
+from tests.support import slow
 
 
 class TestLucera2L2G(unittest.TestCase):
@@ -52,6 +53,7 @@ class TestLucera2L2G(unittest.TestCase):
             restored_data = open(restored_l2j_path, 'rb').read()
             self.assertEqual(restored_data, bytes(raw_l2j))
 
+    @slow
     def test_ai_diagnostics_cliff_repair(self):
         with tempfile.TemporaryDirectory() as td:
             geo_path = os.path.join(td, "20_20.l2j")

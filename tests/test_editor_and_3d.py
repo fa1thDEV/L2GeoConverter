@@ -30,6 +30,7 @@ from geolib.formats import (
     sniff_format, L2GCodec, pack_pts_header, pts_flat_surface, GeoError
 )
 from geolib.diagnostics import geo_to_world, world_to_geo
+from tests.support import slow
 
 
 def make_test_region(default_h: int = 100, default_nswe: int = FLAG_ALL):
@@ -51,29 +52,34 @@ class TestGeodataEditorAnd3D(unittest.TestCase):
         self.assertEqual(res, 0)
         self.assertEqual(blocks[0][0][0][0], quant_h(100))
 
+    @slow
     def test_002_shift_z_positive(self):
         blocks = make_test_region(100)
         res = shift_z_blocks(blocks, 50)
         self.assertEqual(res, BLOCKS * 64)
         self.assertEqual(blocks[0][0][0][0], quant_h(150))
 
+    @slow
     def test_003_shift_z_negative(self):
         blocks = make_test_region(100)
         shift_z_blocks(blocks, -150)
         self.assertEqual(blocks[0][0][0][0], quant_h(-50))
 
+    @slow
     def test_004_shift_z_preserves_nswe_flags(self):
         blocks = make_test_region(100, FLAG_ALL)
         blocks[0][5] = [(100, FLAG_EAST | FLAG_NORTH)]
         shift_z_blocks(blocks, 32)
         self.assertEqual(blocks[0][5][0][1], FLAG_EAST | FLAG_NORTH)
 
+    @slow
     def test_005_shift_z_preserves_none_flags(self):
         blocks = make_test_region(100, FLAG_ALL)
         blocks[0][0] = [(100, FLAG_NONE)]
         shift_z_blocks(blocks, 20)
         self.assertEqual(blocks[0][0][0][1], FLAG_NONE)
 
+    @slow
     def test_006_shift_z_multilayer_all(self):
         blocks = make_test_region(100)
         blocks[10][3] = [(100, FLAG_ALL), (350, FLAG_ALL)]
@@ -81,6 +87,7 @@ class TestGeodataEditorAnd3D(unittest.TestCase):
         self.assertEqual(blocks[10][3][0][0], quant_h(200))
         self.assertEqual(blocks[10][3][1][0], quant_h(450))
 
+    @slow
     def test_007_shift_z_multilayer_specific_layer0(self):
         blocks = make_test_region(96)
         blocks[10][3] = [(quant_h(96), FLAG_ALL), (quant_h(352), FLAG_ALL)]
@@ -88,6 +95,7 @@ class TestGeodataEditorAnd3D(unittest.TestCase):
         self.assertEqual(blocks[10][3][0][0], quant_h(192))
         self.assertEqual(blocks[10][3][1][0], quant_h(352))  # Layer 1 unchanged
 
+    @slow
     def test_008_shift_z_multilayer_specific_layer1(self):
         blocks = make_test_region(96)
         blocks[10][3] = [(quant_h(96), FLAG_ALL), (quant_h(352), FLAG_ALL)]
@@ -95,6 +103,7 @@ class TestGeodataEditorAnd3D(unittest.TestCase):
         self.assertEqual(blocks[10][3][0][0], quant_h(96))  # Layer 0 unchanged
         self.assertEqual(blocks[10][3][1][0], quant_h(448))
 
+    @slow
     def test_009_shift_z_quantization_step(self):
         blocks = make_test_region(0)
         shift_z_blocks(blocks, 7)  # Not multiple of 8
@@ -102,16 +111,19 @@ class TestGeodataEditorAnd3D(unittest.TestCase):
         h = blocks[0][0][0][0]
         self.assertEqual(h % 8, 0)
 
+    @slow
     def test_010_shift_z_extreme_positive_clamping(self):
         blocks = make_test_region(16000)
         shift_z_blocks(blocks, 1000)
         self.assertLessEqual(blocks[0][0][0][0], 16384)
 
+    @slow
     def test_011_shift_z_extreme_negative_clamping(self):
         blocks = make_test_region(-16000)
         shift_z_blocks(blocks, -1000)
         self.assertGreaterEqual(blocks[0][0][0][0], -16384)
 
+    @slow
     def test_012_shift_z_flat_block_copy_isolation(self):
         # Ensure modifying one cell in a shared list doesn't mutate others
         blocks = make_test_region(200)
@@ -120,12 +132,14 @@ class TestGeodataEditorAnd3D(unittest.TestCase):
         blocks[0][0] = [(999, FLAG_NONE)]
         self.assertNotEqual(blocks[0][1][0][0], 999)
 
+    @slow
     def test_013_shift_z_multiple_passes(self):
         blocks = make_test_region(96)
         shift_z_blocks(blocks, 48)
         shift_z_blocks(blocks, -24)
         self.assertEqual(blocks[0][0][0][0], quant_h(120))
 
+    @slow
     def test_014_shift_z_all_blocks_uniformity(self):
         blocks = make_test_region(50)
         shift_z_blocks(blocks, 16)
@@ -134,16 +148,19 @@ class TestGeodataEditorAnd3D(unittest.TestCase):
             self.assertEqual(blocks[b][0][0][0], expected)
             self.assertEqual(blocks[b][63][0][0], expected)
 
+    @slow
     def test_015_shift_z_preserves_block_count(self):
         blocks = make_test_region(100)
         shift_z_blocks(blocks, 40)
         self.assertEqual(len(blocks), BLOCKS)
 
+    @slow
     def test_016_shift_z_preserves_cell_count_per_block(self):
         blocks = make_test_region(100)
         shift_z_blocks(blocks, 40)
         self.assertEqual(len(blocks[123]), 64)
 
+    @slow
     def test_017_shift_z_preserves_multilayer_order(self):
         blocks = make_test_region(100)
         blocks[5][0] = [(50, FLAG_ALL), (150, FLAG_ALL), (250, FLAG_ALL)]
@@ -152,6 +169,7 @@ class TestGeodataEditorAnd3D(unittest.TestCase):
         self.assertLess(layers[0][0], layers[1][0])
         self.assertLess(layers[1][0], layers[2][0])
 
+    @slow
     def test_018_shift_z_serialization_roundtrip(self):
         blocks = make_test_region(128)
         shift_z_blocks(blocks, 64)
@@ -166,6 +184,7 @@ class TestGeodataEditorAnd3D(unittest.TestCase):
             if os.path.exists(tf_path):
                 os.remove(tf_path)
 
+    @slow
     def test_019_shift_z_pts_export_compatibility(self):
         blocks = make_test_region(64)
         shift_z_blocks(blocks, 32)
@@ -180,6 +199,7 @@ class TestGeodataEditorAnd3D(unittest.TestCase):
             if os.path.exists(tf_path):
                 os.remove(tf_path)
 
+    @slow
     def test_020_shift_z_l2g_export_compatibility(self):
         blocks = make_test_region(64)
         shift_z_blocks(blocks, 32)
@@ -378,6 +398,7 @@ class TestGeodataEditorAnd3D(unittest.TestCase):
         self.assertEqual(res["deleted_layers"], 1)
         self.assertEqual(blocks[0][0][0][0], 100)
 
+    @slow
     def test_045_delete_z_range_keep_at_least_one_guard(self):
         blocks = make_test_region(100)
         # Deleting [50, 150] covers the only layer
@@ -386,6 +407,7 @@ class TestGeodataEditorAnd3D(unittest.TestCase):
         self.assertEqual(len(blocks[0][0]), 1)
         self.assertEqual(blocks[0][0][0][1], FLAG_NONE)
 
+    @slow
     def test_046_delete_z_range_allow_empty_cells(self):
         blocks = make_test_region(100)
         delete_z_range_blocks(blocks, 50, 150, keep_at_least_one=False)
@@ -510,12 +532,14 @@ class TestGeodataEditorAnd3D(unittest.TestCase):
     # SUITE 4: RECALCULATE SLOPE / Z-WIZARD (Tests 61 to 75)
     # =========================================================================
 
+    @slow
     def test_061_slope_flat_terrain_no_sealing(self):
         blocks = make_test_region(100, FLAG_ALL)
         res = recalculate_slope_flags(blocks, max_climb_z=24)
         self.assertEqual(res["sealed_passages"], 0)
         self.assertEqual(blocks[0][0][0][1], FLAG_ALL)
 
+    @slow
     def test_062_slope_gentle_climb_permitted(self):
         blocks = make_test_region(100, FLAG_ALL)
         # Neighbor at gx=1, gy=0 (c_idx=8)
@@ -524,6 +548,7 @@ class TestGeodataEditorAnd3D(unittest.TestCase):
         self.assertEqual(res["sealed_passages"], 0)
         self.assertEqual(blocks[0][0][0][1], FLAG_ALL)
 
+    @slow
     def test_063_slope_steep_east_west_sealing(self):
         blocks = make_test_region(100, FLAG_ALL)
         # gx=0 is cell 0 in block 0. gx=1 is cell 8 (cx=1, cy=0).
@@ -536,6 +561,7 @@ class TestGeodataEditorAnd3D(unittest.TestCase):
         # gx=1 should lose WEST (0x02)
         self.assertEqual(nswe_1 & FLAG_WEST, 0)
 
+    @slow
     def test_064_slope_steep_south_north_sealing(self):
         blocks = make_test_region(100, FLAG_ALL)
         # gy=0 is cell 0. gy=1 is cell 1 (cx=0, cy=1).
@@ -548,6 +574,7 @@ class TestGeodataEditorAnd3D(unittest.TestCase):
         # gy=1 should lose NORTH (0x08)
         self.assertEqual(nswe_1 & FLAG_NORTH, 0)
 
+    @slow
     def test_065_slope_cross_block_boundary_east_west(self):
         blocks = make_test_region(100, FLAG_ALL)
         # gx=7 is block 0 cell (7<<3)|0 = 56. gx=8 is block 256 cell 0.
@@ -557,6 +584,7 @@ class TestGeodataEditorAnd3D(unittest.TestCase):
         self.assertEqual(blocks[0][56][0][1] & FLAG_EAST, 0)
         self.assertEqual(blocks[256][0][0][1] & FLAG_WEST, 0)
 
+    @slow
     def test_066_slope_cross_block_boundary_south_north(self):
         blocks = make_test_region(100, FLAG_ALL)
         # gy=7 is block 0 cell 7. gy=8 is block 1 cell 0.
@@ -566,6 +594,7 @@ class TestGeodataEditorAnd3D(unittest.TestCase):
         self.assertEqual(blocks[0][7][0][1] & FLAG_SOUTH, 0)
         self.assertEqual(blocks[1][0][0][1] & FLAG_NORTH, 0)
 
+    @slow
     def test_067_slope_custom_climb_threshold(self):
         blocks = make_test_region(100, FLAG_ALL)
         blocks[0][8] = [(140, FLAG_ALL)]  # Delta = 40
@@ -576,6 +605,7 @@ class TestGeodataEditorAnd3D(unittest.TestCase):
         res2 = recalculate_slope_flags(blocks, max_climb_z=32)
         self.assertGreater(res2["sealed_passages"], 0)
 
+    @slow
     def test_068_slope_checked_boundaries_count(self):
         blocks = make_test_region(100, FLAG_ALL)
         res = recalculate_slope_flags(blocks, max_climb_z=24)
@@ -584,6 +614,7 @@ class TestGeodataEditorAnd3D(unittest.TestCase):
         # Total = 8,384,512
         self.assertEqual(res["checked_boundaries"], (CELLS_PER_AXIS - 1) * CELLS_PER_AXIS * 2)
 
+    @slow
     def test_069_slope_symmetric_blocking(self):
         blocks = make_test_region(100, FLAG_ALL)
         blocks[0][8] = [(180, FLAG_ALL)]
@@ -593,6 +624,7 @@ class TestGeodataEditorAnd3D(unittest.TestCase):
         can_go_w = bool(blocks[0][8][0][1] & FLAG_WEST)
         self.assertEqual(can_go_e, can_go_w)
 
+    @slow
     def test_070_slope_does_not_affect_unrelated_flags(self):
         blocks = make_test_region(100, FLAG_ALL)
         blocks[0][8] = [(200, FLAG_ALL)]
@@ -601,6 +633,7 @@ class TestGeodataEditorAnd3D(unittest.TestCase):
         self.assertTrue(blocks[0][0][0][1] & FLAG_NORTH)
         self.assertTrue(blocks[0][0][0][1] & FLAG_SOUTH)
 
+    @slow
     def test_071_slope_edge_of_world_x(self):
         blocks = make_test_region(100, FLAG_ALL)
         # Max cell: gx=2047
@@ -611,6 +644,7 @@ class TestGeodataEditorAnd3D(unittest.TestCase):
         res = recalculate_slope_flags(blocks, max_climb_z=24)
         self.assertIsNotNone(res)
 
+    @slow
     def test_072_slope_edge_of_world_y(self):
         blocks = make_test_region(100, FLAG_ALL)
         # Max cell: gy=2047
@@ -620,6 +654,7 @@ class TestGeodataEditorAnd3D(unittest.TestCase):
         res = recalculate_slope_flags(blocks, max_climb_z=24)
         self.assertIsNotNone(res)
 
+    @slow
     def test_073_slope_isolated_high_pillar(self):
         blocks = make_test_region(100, FLAG_ALL)
         # Pillar at gx=1, gy=1 surrounded by 100
@@ -629,6 +664,7 @@ class TestGeodataEditorAnd3D(unittest.TestCase):
         # All 4 directions of pillar should be blocked (0x00)
         self.assertEqual(blocks[0][9][0][1], FLAG_NONE)
 
+    @slow
     def test_074_slope_four_way_pit(self):
         blocks = make_test_region(300, FLAG_ALL)
         # Pit at gx=1, gy=1 at Z=50
@@ -636,6 +672,7 @@ class TestGeodataEditorAnd3D(unittest.TestCase):
         recalculate_slope_flags(blocks, max_climb_z=24)
         self.assertEqual(blocks[0][9][0][1], FLAG_NONE)
 
+    @slow
     def test_075_slope_roundtrip_persistence(self):
         blocks = make_test_region(100, FLAG_ALL)
         blocks[0][8] = [(200, FLAG_ALL)]
@@ -859,6 +896,7 @@ class TestGeodataEditorAnd3D(unittest.TestCase):
         with self.assertRaises(GeoError):
             save_edited_region(blocks, "dummy.xyz", target_format="unknown_format")
 
+    @slow
     def test_105_full_pipeline_multi_operation_stability(self):
         # 1. Create region
         blocks = make_test_region(100)

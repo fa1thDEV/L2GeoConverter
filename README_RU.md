@@ -141,7 +141,22 @@ Lucera 2 упаковывает 65 536 блоков L2J потоковым ши�
 
 ## Сборка из исходников
 
-Требования: Python 3.8+ (только стандартная библиотека).
+Требования: Python 3.8+. Ядро использует только стандартную библиотеку; дополнительно:
+
+```bash
+pip install -r requirements.txt        # Pillow: масштабирование изображений в GUI (нужен Tkinter)
+pip install -r requirements-accel.txt  # Taichi + NumPy: ускорение трассировки в `generate`
+```
+
+### Запуск тестов
+
+```bash
+pip install -r requirements-dev.txt
+python -m pytest -m "not slow"   # быстрый прогон (~20 с)
+python -m pytest                 # полный набор, включая тяжёлые тесты на целых регионах
+```
+
+Тесты, которым нужен настоящий клиент Lineage 2, пропускаются, если не заданы `L2_CLIENT_DIR` (корень клиента с `Maps/`, `Textures/`, `StaticMeshes/`) и `L2_GEODATA_DIR` (папка геодаты сервера). CI запускает линтер и тесты на Linux и Windows при каждом push.
 
 Сборка standalone-бинарника для Windows:
 ```bash

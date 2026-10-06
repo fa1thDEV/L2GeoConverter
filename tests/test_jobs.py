@@ -4,9 +4,10 @@
 
 import unittest
 
-from geolib.generate import (
+from geolib.generate import _pool_status_lines
+from geolib.resources import (
     MAX_CPU_PCT, MIN_FREE_RAM_GB, _avail_ram_gb, _cpu_rate_units,
-    _pool_status_lines, cpu_worker_cap, want_worker_delta,
+    cpu_worker_cap, want_worker_delta,
 )
 
 

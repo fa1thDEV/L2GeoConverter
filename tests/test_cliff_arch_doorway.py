@@ -12,10 +12,12 @@ from geolib.diagnostics import (
     GeoDiagnosticEngine, get_cell_layers, parse_region,
     FLAG_EAST, FLAG_WEST, FLAG_SOUTH, FLAG_NORTH, FLAG_ALL
 )
+from tests.support import slow
 
 
 class TestCliffArchDoorway(unittest.TestCase):
 
+    @slow
     def test_arch_doorway_ground_passable_after_repair(self):
         """
         Simulate an archway (e.g. in Giran):
