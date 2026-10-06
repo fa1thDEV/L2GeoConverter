@@ -84,7 +84,8 @@ Salida en consola:
 ```powershell
 .\GeoConverter.bat diagnose "geodata/16_20.l2g" --fix -o ./geodata_reparada
 ```
-- Repara sellando flags hacia desniveles infranqueables y garantizando simetría bidireccional en rampas transitables ($\Delta Z \le 32$).
+- Repara sellando flags hacia desniveles infranqueables y, en asimetrías transitables ($\Delta Z \le 32$), cerrando el lado abierto: nunca abre un flag cerrado, porque sin la colisión original no se puede saber si ahí hay una pared.
+- Las capas se emparejan desde **ambas** celdas, así que una capa superior que solo existe en la vecina también se revisa.
 
 #### E. Modo JSON para Integración y Scripts (`--json`)
 ```powershell
@@ -216,7 +217,7 @@ Cada celda de geodata ($16 \times 16$ unidades de mundo) almacena su cota $Z$ y 
 2. **Columna / Bloque Sólido**:
    - Asignar `nswe = 0x00` a la celda completa. Ningún personaje puede entrar desde ningún ángulo.
 3. **Paredes Trampa Unidireccionales (`NSWE_ASYMMETRY`)**:
-   - Ocurre cuando una celda permite ir al Este, pero la contigua prohíbe volver al Oeste. El jugador entra pero queda atrapado. La herramienta detecta estas asimetrías y las repara con `--fix`.
+   - Ocurre cuando una celda permite ir al Este, pero la contigua prohíbe volver al Oeste. El jugador entra pero queda atrapado. La herramienta detecta estas asimetrías y, con `--fix`, cierra el lado abierto.
 
 ---
 

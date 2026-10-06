@@ -7,6 +7,7 @@ import os
 import re
 import struct
 import time
+from pathlib import Path
 
 from .formats import (
     BLOCKS, PROTO_GD, PTS_HEADER, GeoError, normalize_protocol, pack_pts_header,
@@ -51,9 +52,9 @@ def pts2l2j_bytes(data):
 
 def convert_file(src, dst):
     """PTS conv.dat → l2j (streaming recode). Returns (flat, cx, ml)."""
-    data = open(src, 'rb').read()
+    data = Path(src).read_bytes()
     l2j, stats = pts2l2j_bytes(data)
-    open(dst, 'wb').write(l2j)
+    Path(dst).write_bytes(l2j)
     return stats
 
 
@@ -362,24 +363,24 @@ def cmd_l2j2pts(paths, out_dir, assume_yes=False, protocol=PROTO_GD):
 
 def l2g2l2j_file(src, dst):
     """Decrypts Lucera 2 .l2g to standard .l2j."""
-    enc = open(src, 'rb').read()
+    enc = Path(src).read_bytes()
     dec = L2GCodec.decrypt(enc)
     validate_l2j_bytes(dec)
-    open(dst, 'wb').write(dec)
+    Path(dst).write_bytes(dec)
 
 
 def l2j2l2g_file(src, dst):
     """Encrypts standard .l2j to Lucera 2 .l2g."""
-    raw = open(src, 'rb').read()
+    raw = Path(src).read_bytes()
     validate_l2j_bytes(raw)
     enc = L2GCodec.encrypt(raw)
-    open(dst, 'wb').write(enc)
+    Path(dst).write_bytes(enc)
 
 
 def pts2l2g_file(src, dst):
     """PTS _conv.dat -> Lucera 2 .l2g."""
     # Convert to L2J in-memory, then encrypt
-    data = open(src, 'rb').read()
+    data = Path(src).read_bytes()
     out = bytearray()
     pos = PTS_HEADER
     for _ in range(BLOCKS):
@@ -401,16 +402,16 @@ def pts2l2g_file(src, dst):
                 out += data[pos:pos + nl * 2]; pos += nl * 2
     validate_l2j_bytes(out)
     enc = L2GCodec.encrypt(bytes(out))
-    open(dst, 'wb').write(enc)
+    Path(dst).write_bytes(enc)
 
 
 def l2g2pts_file(src, dst, rx, ry, protocol=PROTO_GD):
     """Lucera 2 .l2g -> PTS _conv.dat."""
-    enc = open(src, 'rb').read()
+    enc = Path(src).read_bytes()
     dec = L2GCodec.decrypt(enc)
     validate_l2j_bytes(dec)
     pts, _, _, _ = l2j2pts_bytes(dec, rx, ry, protocol)
-    open(dst, 'wb').write(pts)
+    Path(dst).write_bytes(pts)
 
 
 def cmd_l2g2l2j(paths, out_dir, assume_yes=False):
@@ -471,10 +472,10 @@ def cmd_l2j2l2g(paths, out_dir, assume_yes=False):
 
 def pts2l2g_file(src, dst, rx, ry):
     """PTS _conv.dat -> Lucera 2 .l2g."""
-    data = open(src, 'rb').read()
+    data = Path(src).read_bytes()
     l2j_bytes, _ = pts2l2j_bytes(data)
     enc = L2GCodec.encrypt(l2j_bytes)
-    open(dst, 'wb').write(enc)
+    Path(dst).write_bytes(enc)
 
 
 def cmd_l2g2pts(paths, out_dir, assume_yes=False, protocol=PROTO_GD):

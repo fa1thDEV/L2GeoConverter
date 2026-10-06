@@ -97,7 +97,7 @@ In Lineage 2 geodata, each cell (16x16 world units) stores an elevation ($Z$) an
    - On Cell B $(gx+1, gy)$: `nswe &= ~FLAG_WEST` (`0x02`).
    The player's client renders open, flat terrain, but the server collision matrix rejects movement packets attempting to cross the boundary.
 2. **Solid Column**: Set the target cell's bitmask to `0x00` (`FLAG_NONE`). Characters cannot enter this 16x16 coordinate column from any angle.
-3. **One-Way Traps (`NSWE_ASYMMETRY`)**: If Cell A allows East movement but Cell B forbids West return, a player walking into Cell B becomes permanently stuck. The diagnostic engine scans for this asymmetry and can restore bidirectional passage with `--fix`.
+3. **One-Way Traps (`NSWE_ASYMMETRY`)**: If Cell A allows East movement but Cell B forbids West return, a player walking into Cell B becomes permanently stuck. The diagnostic engine scans for this asymmetry; `--fix` closes the open side (it never opens a closed flag, since the original collision is not available to prove the passage is real).
 
 ---
 

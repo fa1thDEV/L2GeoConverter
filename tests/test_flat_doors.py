@@ -6,6 +6,7 @@ import os
 import struct
 import tempfile
 import unittest
+from pathlib import Path
 
 from geolib.convert import convert_file, l2j2pts_bytes, validate_pts_bytes
 from geolib.doors import (
@@ -51,7 +52,7 @@ class QuantAndPtsFlatTests(unittest.TestCase):
             pts += struct.pack('<Hhh', 0x0000, -4648, -4648)
         with tempfile.TemporaryDirectory() as td:
             p = os.path.join(td, '19_19_conv.dat')
-            open(p, 'wb').write(pts)
+            Path(p).write_bytes(pts)
             blocks = parse_region(p)
         self.assertEqual(blocks[0][0][0], (-3352, 15))
 
@@ -109,7 +110,7 @@ class FlattenTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as td:
             src = os.path.join(td, '19_21_conv.dat')
             dst = os.path.join(td, '19_21.l2j')
-            open(src, 'wb').write(pts)
+            Path(src).write_bytes(pts)
             convert_file(src, dst)
             back = parse_region(dst)
         self.assertEqual(back[0][0][0], (-4648, 15))
@@ -131,7 +132,7 @@ class DoorTests(unittest.TestCase):
     def test_parse_skips_wall_type(self):
         with tempfile.TemporaryDirectory() as td:
             p = os.path.join(td, 'doordata.txt')
-            open(p, 'w', encoding='utf-8').write(self.SAMPLE)
+            Path(p).write_text(self.SAMPLE, encoding='utf-8')
             doors = parse_doors(p)
         self.assertEqual(len(doors), 1)
         self.assertEqual(doors[0]['name'], 'gludio_castle_outter_001')
@@ -139,7 +140,7 @@ class DoorTests(unittest.TestCase):
     def test_open_gate_cell(self):
         with tempfile.TemporaryDirectory() as td:
             p = os.path.join(td, 'doordata.txt')
-            open(p, 'w', encoding='utf-8').write(self.SAMPLE)
+            Path(p).write_text(self.SAMPLE, encoding='utf-8')
             doors = parse_doors(p)
         west, north = (19 - 20) * 32768, (21 - 18) * 32768
         idx = door_index_for_region(doors, west, north)
@@ -170,12 +171,12 @@ class DoorTests(unittest.TestCase):
     def test_find_doordata_explicit_and_client(self):
         with tempfile.TemporaryDirectory() as td:
             p = os.path.join(td, 'doordata.txt')
-            open(p, 'w', encoding='utf-8').write(self.SAMPLE)
+            Path(p).write_text(self.SAMPLE, encoding='utf-8')
             self.assertEqual(find_doordata(None, p), p)
             client = os.path.join(td, 'client')
             os.makedirs(os.path.join(client, 'Script'))
             script = os.path.join(client, 'Script', 'doordata.txt')
-            open(script, 'w', encoding='utf-8').write(self.SAMPLE)
+            Path(script).write_text(self.SAMPLE, encoding='utf-8')
             self.assertEqual(find_doordata(client), script)
             empty = os.path.join(td, 'empty_client')
             os.makedirs(empty)

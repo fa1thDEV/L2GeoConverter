@@ -39,7 +39,7 @@ class DiagnoseTabMixin:
         opt_frame = ttk.LabelFrame(f, text=" Repair Options / Настройки исправления ", padding=8)
         opt_frame.pack(fill="x", pady=6)
 
-        self.diag_fix_var = BooleanVar(value=True)
+        self.diag_fix_var = BooleanVar(value=False)
         cb_fix = ttk.Checkbutton(
             opt_frame,
             text="Auto-Repair detected issues (Seals cliff falls, fixes asymmetric walls) / Исправлять найденные ошибки",
