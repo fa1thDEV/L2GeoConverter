@@ -387,13 +387,13 @@ def interactive():
 
 
 def main():
-    # Machine-readable front ends for AI agents: no banner, JSON only.
+    # Machine-readable front ends: no banner, JSON only.
     if len(sys.argv) > 1 and sys.argv[1] in ('llm', 'mcp'):
-        from geolib import agent
-        return agent.cli_main(sys.argv[2:]) if sys.argv[1] == 'llm' else agent.mcp_main()
+        from geolib import jsontools
+        return jsontools.cli_main(sys.argv[2:]) if sys.argv[1] == 'llm' else jsontools.mcp_main()
     ap = argparse.ArgumentParser(description='L2 Geodata Toolkit',
-                                 epilog='AI agents: `geotool.py llm list` (JSON CLI) '
-                                        'or `geotool.py mcp` (MCP server over stdio).')
+                                 epilog='JSON mode: `geotool.py llm list`; '
+                                        'MCP server over stdio: `geotool.py mcp`.')
     sub = ap.add_subparsers(dest='cmd')
     p = sub.add_parser('convert'); p.add_argument('src', nargs='+'); p.add_argument('-o', '--out', required=True); p.add_argument('-y', '--yes', action='store_true')
     p = sub.add_parser('view'); p.add_argument('dir'); p.add_argument('--port', type=int, default=8777)

@@ -70,9 +70,9 @@ python geotool.py generate path/to/client/ -o ./output --region 20_20
 
 On Windows, `GeoConverter.bat` is provided as a shortcut for drag-and-drop file processing and quick tasks.
 
-### AI agents (LLM CLI and MCP server)
+### JSON mode and MCP server
 
-`geotool.py llm` runs one tool per call and prints a single JSON object (no colours or progress bars), so an AI agent can inspect and test geodata without writing scripts:
+`geotool.py llm` runs one tool per call and prints a single JSON object (no colours or progress bars), handy for scripts and external tools:
 
 ```bash
 python geotool.py llm list                                    # tool schemas
@@ -81,7 +81,7 @@ python geotool.py llm diagnose path=geodata/22_22.l2j max_issues=20
 python geotool.py llm run_tests                               # fast test subset
 ```
 
-Tools: `info`, `cell`, `area`, `diagnose`, `diff`, `validate`, `convert`, `unr_info`, `run_tests`. The same tools are served over MCP (stdio) by `python geotool.py mcp`; `.mcp.json` registers it for Claude Code, and parsed regions stay cached between calls.
+Tools: `info`, `cell`, `area`, `diagnose`, `diff`, `validate`, `convert`, `unr_info`, `run_tests`. The same tools are served over MCP (stdio) by `python geotool.py mcp`; parsed regions stay cached between calls.
 
 ---
 

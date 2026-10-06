@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""Machine-readable tools for AI agents (LLM CLI mode and MCP server).
+"""Machine-readable geodata tools (JSON CLI mode and MCP server).
 
 Every tool takes JSON-able keyword arguments and returns a JSON-able dict.
 Library output (colours, progress bars) is captured, never mixed into the
@@ -405,7 +405,7 @@ def call(name, args=None):
     return out
 
 
-# ───────────────────────────── LLM CLI ─────────────────────────────
+# ───────────────────────────── JSON CLI ─────────────────────────────
 
 def _parse_value(v):
     try:

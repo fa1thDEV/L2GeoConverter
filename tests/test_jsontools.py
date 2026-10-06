@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""AI-agent front ends: JSON tools, LLM CLI and MCP stdio server."""
+"""JSON tools, JSON CLI mode and MCP stdio server."""
 
 import io
 import json
@@ -10,7 +10,7 @@ import tempfile
 import unittest
 from contextlib import redirect_stdout
 
-from geolib import agent
+from geolib import jsontools
 from geolib.formats import BLOCKS, enc_cell, quant_h
 
 
@@ -27,7 +27,7 @@ def _region_l2j(z=-3000):
     return bytes(out)
 
 
-class AgentToolTests(unittest.TestCase):
+class JsonToolTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.td = tempfile.TemporaryDirectory()
@@ -40,7 +40,7 @@ class AgentToolTests(unittest.TestCase):
         cls.td.cleanup()
 
     def ok(self, name, **args):
-        out = agent.call(name, args)
+        out = jsontools.call(name, args)
         self.assertTrue(out['ok'], out)
         return out['result']
 
@@ -72,16 +72,16 @@ class AgentToolTests(unittest.TestCase):
         self.assertTrue(self.ok('diff', path_a=self.path, path_b=dst)['identical'])
 
     def test_errors_are_reported_not_raised(self):
-        self.assertFalse(agent.call('cell', {'path': self.path})['ok'])
-        self.assertFalse(agent.call('cell', {'path': self.path, 'gx': 5000, 'gy': 0})['ok'])
-        self.assertFalse(agent.call('cell', {'path': 'missing.l2j', 'gx': 0, 'gy': 0})['ok'])
-        self.assertIn('unknown args', agent.call('info', {'path': self.path, 'bogus': 1})['error'])
-        self.assertIn('unknown tool', agent.call('nope')['error'])
+        self.assertFalse(jsontools.call('cell', {'path': self.path})['ok'])
+        self.assertFalse(jsontools.call('cell', {'path': self.path, 'gx': 5000, 'gy': 0})['ok'])
+        self.assertFalse(jsontools.call('cell', {'path': 'missing.l2j', 'gx': 0, 'gy': 0})['ok'])
+        self.assertIn('unknown args', jsontools.call('info', {'path': self.path, 'bogus': 1})['error'])
+        self.assertIn('unknown tool', jsontools.call('nope')['error'])
 
     def test_cli_outputs_single_json_line(self):
         buf = io.StringIO()
         with redirect_stdout(buf):
-            rc = agent.cli_main(['cell', f'path={self.path}', 'gx=0', 'gy=0'])
+            rc = jsontools.cli_main(['cell', f'path={self.path}', 'gx=0', 'gy=0'])
         self.assertEqual(rc, 0)
         lines = buf.getvalue().strip().splitlines()
         self.assertEqual(len(lines), 1)
@@ -101,7 +101,7 @@ class AgentToolTests(unittest.TestCase):
         ]
         stdin = io.StringIO('\n'.join(json.dumps(r) for r in reqs) + '\nnot json\n')
         stdout = io.StringIO()
-        agent.mcp_main(stdin, stdout)
+        jsontools.mcp_main(stdin, stdout)
         resp = [json.loads(ln) for ln in stdout.getvalue().splitlines()]
         by_id = {r['id']: r for r in resp}
         self.assertEqual(len(resp), 6)  # notification gets no reply

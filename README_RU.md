@@ -148,9 +148,9 @@ pip install -r requirements.txt        # Pillow: масштабирование 
 pip install -r requirements-accel.txt  # Taichi + NumPy: ускорение трассировки в `generate`
 ```
 
-### Режим для ИИ (JSON CLI и MCP-сервер)
+### JSON-режим и MCP-сервер
 
-`geotool.py llm <tool> key=value ...` выполняет один инструмент и печатает один JSON-объект (без цветов и прогресс-баров); `geotool.py llm list` — список инструментов. Те же инструменты доступны по MCP (stdio): `python geotool.py mcp`, сервер зарегистрирован в `.mcp.json`.
+`geotool.py llm <tool> key=value ...` выполняет один инструмент и печатает один JSON-объект (без цветов и прогресс-баров); `geotool.py llm list` — список инструментов. Те же инструменты доступны по MCP (stdio): `python geotool.py mcp`.
 
 ### Запуск тестов
 

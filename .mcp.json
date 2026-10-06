@@ -1,8 +1,0 @@
-{
-  "mcpServers": {
-    "l2geo": {
-      "command": "python",
-      "args": ["geotool.py", "mcp"]
-    }
-  }
-}
