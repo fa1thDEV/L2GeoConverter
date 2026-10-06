@@ -34,6 +34,16 @@ BLOCKS_PER_AXIS = 256
 CELLS_PER_AXIS  = BLOCKS_PER_AXIS * CELLS_PER_BLOCK # 2048
 REGION_WORLD_SIZE = 32768 # World units per region
 
+# (dx, dy, flag toward neighbour, neighbour's flag back, name)
+DIRECTIONS = (
+    (1, 0, FLAG_EAST, FLAG_WEST, "EAST"),
+    (-1, 0, FLAG_WEST, FLAG_EAST, "WEST"),
+    (0, 1, FLAG_SOUTH, FLAG_NORTH, "SOUTH"),
+    (0, -1, FLAG_NORTH, FLAG_SOUTH, "NORTH"),
+)
+# Pairs of opposite directions; repair walks each cell boundary once.
+FORWARD_DIRECTIONS = (DIRECTIONS[0], DIRECTIONS[2])
+
 def geo_to_world(rx: int, ry: int, gx: int, gy: int, z: int = 0) -> Tuple[int, int, int]:
     wx = (rx - 20) * REGION_WORLD_SIZE + (gx << 4) + 8
     wy = (ry - 18) * REGION_WORLD_SIZE + (gy << 4) + 8
@@ -75,9 +85,11 @@ def set_cell_layers(blocks: List[Any], gx: int, gy: int, layers: List[Tuple[int,
 
 
 class GeoDiagnosticEngine:
-    def __init__(self, cliff_threshold: int = 48, min_clearance: int = 32):
+    def __init__(self, cliff_threshold: int = 48, min_clearance: int = 32,
+                 max_step: int = 32):
         self.cliff_threshold = cliff_threshold
         self.min_clearance = min_clearance
+        self.max_step = max_step
 
     def analyze(self, path: str, max_issues: int = 100, stop_event=None) -> Dict[str, Any]:
         rx, ry = region_of(path)
@@ -131,69 +143,41 @@ class GeoDiagnosticEngine:
                                 "details": {"z": h}
                             })
 
-                    # Check East (gx+1, gy)
-                    if (nswe & FLAG_EAST) and gx + 1 < CELLS_PER_AXIS:
-                        n_layers = get_cell_layers(blocks, gx + 1, gy)
-                        n_layer = self._closest(h, n_layers)
-                        if n_layer:
-                            nh, nnswe = n_layer
-                            if not (nnswe & FLAG_WEST):
-                                stats["asymmetry_errors"] += 1
-                                if len(issues) < max_issues:
-                                    wx, wy, _ = geo_to_world(rx, ry, gx, gy)
-                                    issues.append({
-                                        "severity": "WARNING",
-                                        "type": "NSWE_ASYMMETRY",
-                                        "geo": [gx, gy],
-                                        "world": [wx, wy],
-                                        "msg": f"One-way East passage to ({gx+1},{gy}) but neighbor denies West entry",
-                                        "details": {"dir": "EAST", "target_geo": [gx+1, gy]}
-                                    })
-                            h_diff = abs(h - nh)
-                            if h_diff > self.cliff_threshold and h > nh:
-                                stats["cliff_errors"] += 1
-                                if len(issues) < max_issues:
-                                    wx, wy, _ = geo_to_world(rx, ry, gx, gy)
-                                    issues.append({
-                                        "severity": "CRITICAL",
-                                        "type": "CLIFF_FALL",
-                                        "geo": [gx, gy],
-                                        "world": [wx, wy],
-                                        "msg": f"Hazardous cliff drop of {h_diff}u with open East flag (Z1={h}, Z2={nh})",
-                                        "details": {"dir": "EAST", "drop": h_diff, "from_z": h, "to_z": nh}
-                                    })
-
-                    # Check South (gx, gy+1)
-                    if (nswe & FLAG_SOUTH) and gy + 1 < CELLS_PER_AXIS:
-                        n_layers = get_cell_layers(blocks, gx, gy + 1)
-                        n_layer = self._closest(h, n_layers)
-                        if n_layer:
-                            nh, nnswe = n_layer
-                            if not (nnswe & FLAG_NORTH):
-                                stats["asymmetry_errors"] += 1
-                                if len(issues) < max_issues:
-                                    wx, wy, _ = geo_to_world(rx, ry, gx, gy)
-                                    issues.append({
-                                        "severity": "WARNING",
-                                        "type": "NSWE_ASYMMETRY",
-                                        "geo": [gx, gy],
-                                        "world": [wx, wy],
-                                        "msg": f"One-way South passage to ({gx},{gy+1}) but neighbor denies North entry",
-                                        "details": {"dir": "SOUTH", "target_geo": [gx, gy+1]}
-                                    })
-                            h_diff = abs(h - nh)
-                            if h_diff > self.cliff_threshold and h > nh:
-                                stats["cliff_errors"] += 1
-                                if len(issues) < max_issues:
-                                    wx, wy, _ = geo_to_world(rx, ry, gx, gy)
-                                    issues.append({
-                                        "severity": "CRITICAL",
-                                        "type": "CLIFF_FALL",
-                                        "geo": [gx, gy],
-                                        "world": [wx, wy],
-                                        "msg": f"Hazardous cliff drop of {h_diff}u with open South flag (Z1={h}, Z2={nh})",
-                                        "details": {"dir": "SOUTH", "drop": h_diff, "from_z": h, "to_z": nh}
-                                    })
+                    # Every open flag is checked from its own side, so a drop
+                    # or one-way passage toward W/N is reported as well.
+                    for dx, dy, flag, back, dname in DIRECTIONS:
+                        nx, ny = gx + dx, gy + dy
+                        if not (nswe & flag) or not (0 <= nx < CELLS_PER_AXIS and 0 <= ny < CELLS_PER_AXIS):
+                            continue
+                        n_layer = self._closest(h, get_cell_layers(blocks, nx, ny))
+                        if not n_layer:
+                            continue
+                        nh, nnswe = n_layer
+                        if not (nnswe & back):
+                            stats["asymmetry_errors"] += 1
+                            if len(issues) < max_issues:
+                                wx, wy, _ = geo_to_world(rx, ry, gx, gy)
+                                issues.append({
+                                    "severity": "WARNING",
+                                    "type": "NSWE_ASYMMETRY",
+                                    "geo": [gx, gy],
+                                    "world": [wx, wy],
+                                    "msg": f"One-way {dname.title()} passage to ({nx},{ny}) but neighbor denies return",
+                                    "details": {"dir": dname, "target_geo": [nx, ny]}
+                                })
+                        h_diff = abs(h - nh)
+                        if h_diff > self.cliff_threshold and h > nh:
+                            stats["cliff_errors"] += 1
+                            if len(issues) < max_issues:
+                                wx, wy, _ = geo_to_world(rx, ry, gx, gy)
+                                issues.append({
+                                    "severity": "CRITICAL",
+                                    "type": "CLIFF_FALL",
+                                    "geo": [gx, gy],
+                                    "world": [wx, wy],
+                                    "msg": f"Hazardous cliff drop of {h_diff}u with open {dname.title()} flag (Z1={h}, Z2={nh})",
+                                    "details": {"dir": dname, "drop": h_diff, "from_z": h, "to_z": nh}
+                                })
 
         return {
             "stats": stats,
@@ -230,62 +214,10 @@ class GeoDiagnosticEngine:
                         stats["layers_sorted"] += 1
                         layers = sorted_l
 
-                # Repair East
-                if gx + 1 < CELLS_PER_AXIS:
-                    n_layers = get_cell_layers(unpacked_blocks, gx + 1, gy)
-                    for i, (h, nswe) in enumerate(layers):
-                        match_idx = self._closest_idx(h, n_layers)
-                        if match_idx is not None:
-                            nh, nnswe = n_layers[match_idx]
-                            diff = abs(h - nh)
-                            if diff > self.cliff_threshold:
-                                # Seal cliff passage: only block movement FROM the higher layer towards the lower layer.
-                                # Never seal the lower layer (preserves ground-level walkability through arches/doorways).
-                                if h > nh:
-                                    if nswe & FLAG_EAST:
-                                        layers[i] = (h, nswe & ~FLAG_EAST)
-                                        set_cell_layers(unpacked_blocks, gx, gy, layers)
-                                        stats["cliffs_sealed"] += 1
-                                elif nh > h:
-                                    if nnswe & FLAG_WEST:
-                                        n_layers[match_idx] = (nh, nnswe & ~FLAG_WEST)
-                                        set_cell_layers(unpacked_blocks, gx + 1, gy, n_layers)
-                                        stats["cliffs_sealed"] += 1
-                            elif diff <= 32:
-                                # Ensure bidirectional walkability
-                                if bool(nswe & FLAG_EAST) != bool(nnswe & FLAG_WEST):
-                                    layers[i] = (h, nswe | FLAG_EAST)
-                                    n_layers[match_idx] = (nh, nnswe | FLAG_WEST)
-                                    set_cell_layers(unpacked_blocks, gx, gy, layers)
-                                    set_cell_layers(unpacked_blocks, gx + 1, gy, n_layers)
-                                    stats["asymmetries_repaired"] += 1
-
-                # Repair South
-                if gy + 1 < CELLS_PER_AXIS:
-                    n_layers = get_cell_layers(unpacked_blocks, gx, gy + 1)
-                    for i, (h, nswe) in enumerate(layers):
-                        match_idx = self._closest_idx(h, n_layers)
-                        if match_idx is not None:
-                            nh, nnswe = n_layers[match_idx]
-                            diff = abs(h - nh)
-                            if diff > self.cliff_threshold:
-                                if h > nh:
-                                    if nswe & FLAG_SOUTH:
-                                        layers[i] = (h, nswe & ~FLAG_SOUTH)
-                                        set_cell_layers(unpacked_blocks, gx, gy, layers)
-                                        stats["cliffs_sealed"] += 1
-                                elif nh > h:
-                                    if nnswe & FLAG_NORTH:
-                                        n_layers[match_idx] = (nh, nnswe & ~FLAG_NORTH)
-                                        set_cell_layers(unpacked_blocks, gx, gy + 1, n_layers)
-                                        stats["cliffs_sealed"] += 1
-                            elif diff <= 32:
-                                if bool(nswe & FLAG_SOUTH) != bool(nnswe & FLAG_NORTH):
-                                    layers[i] = (h, nswe | FLAG_SOUTH)
-                                    n_layers[match_idx] = (nh, nnswe | FLAG_NORTH)
-                                    set_cell_layers(unpacked_blocks, gx, gy, layers)
-                                    set_cell_layers(unpacked_blocks, gx, gy + 1, n_layers)
-                                    stats["asymmetries_repaired"] += 1
+                for dx, dy, flag, back, _ in FORWARD_DIRECTIONS:
+                    nx, ny = gx + dx, gy + dy
+                    if nx < CELLS_PER_AXIS and ny < CELLS_PER_AXIS:
+                        self._repair_boundary(unpacked_blocks, gx, gy, nx, ny, flag, back, stats)
 
         # Encode back to target format
         out_fmt = sniff_format(dst_path) or sniff_format(src_path)
@@ -307,6 +239,54 @@ class GeoDiagnosticEngine:
                 f.write(l2j_bytes)
 
         return stats
+
+    def _repair_boundary(self, blocks, gx, gy, nx, ny, flag, back, stats):
+        """Repair the boundary between cell A=(gx,gy) and B=(nx,ny).
+
+        Layers are paired by nearest height in BOTH directions, so an upper
+        layer that exists only on B is still checked against A (otherwise a
+        fall from it would stay open). For each pair:
+
+        * drop > cliff_threshold: close the flag from the HIGHER layer toward
+          the lower one only; the lower floor (e.g. under an arch) keeps it.
+        * step <= max_step with a one-way flag: close the open side. Opening
+          the closed side instead could cut through a thin wall, since the
+          original collision is not available here.
+        """
+        a = get_cell_layers(blocks, gx, gy)
+        b = get_cell_layers(blocks, nx, ny)
+        if not a or not b:
+            return
+        a, b = list(a), list(b)
+        pairs = []
+        for i, (h, _) in enumerate(a):
+            pairs.append((i, self._closest_idx(h, b)))
+        for j, (nh, _) in enumerate(b):
+            pair = (self._closest_idx(nh, a), j)
+            if pair not in pairs:
+                pairs.append(pair)
+        changed = False
+        for i, j in pairs:
+            h, nswe = a[i]
+            nh, nnswe = b[j]
+            diff = abs(h - nh)
+            if diff > self.cliff_threshold:
+                if h > nh and nswe & flag:
+                    a[i] = (h, nswe & ~flag)
+                    stats["cliffs_sealed"] += 1
+                    changed = True
+                elif nh > h and nnswe & back:
+                    b[j] = (nh, nnswe & ~back)
+                    stats["cliffs_sealed"] += 1
+                    changed = True
+            elif diff <= self.max_step and bool(nswe & flag) != bool(nnswe & back):
+                a[i] = (h, nswe & ~flag)
+                b[j] = (nh, nnswe & ~back)
+                stats["asymmetries_repaired"] += 1
+                changed = True
+        if changed:
+            set_cell_layers(blocks, gx, gy, a)
+            set_cell_layers(blocks, nx, ny, b)
 
     def _closest(self, z: int, layers: List[Tuple[int, int]]) -> Optional[Tuple[int, int]]:
         if not layers: return None

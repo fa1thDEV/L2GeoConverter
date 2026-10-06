@@ -63,7 +63,8 @@ To block an entire area (e.g. an invisible perimeter around an event arena or in
 #### Method 3: Fixing One-Way Wall Traps (`NSWE_ASYMMETRY`)
 When Cell A permits movement East (`0x01`) but neighbor Cell B forbids return West (no `0x02`), a player can walk into Cell B but cannot return, becoming trapped.
 Running `L2GeoConverter` with `--fix` checks neighbor pairs:
-* If the elevation difference is walkable ($|\Delta Z| \le 32$), it restores bidirectional flags (`layers[i] |= FLAG_EAST` and `n_layers |= FLAG_WEST`).
+* If the elevation difference is walkable ($|\Delta Z| \le 32$), it closes the open side (`layers[i] &= ~FLAG_EAST`, `n_layers &= ~FLAG_WEST`). It never opens a closed flag: without the original collision a one-sided wall cannot be told apart from a missing flag.
+* Layers are paired by nearest height from **both** cells, so an upper layer that exists only on the neighbour is still checked for drops.
 
 ---
 

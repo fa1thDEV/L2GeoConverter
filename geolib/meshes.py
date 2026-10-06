@@ -195,7 +195,9 @@ class MeshLibrary:
         self.failed = {}
 
     def get(self, pkg_name, mesh_name):
-        key = (pkg_name.lower(), mesh_name)
+        # UE2 names are case-insensitive: maps may import `Rock01` from a
+        # package that exports `rock01`.
+        key = (pkg_name.lower(), mesh_name.lower())
         if key in self.meshes:
             return self.meshes[key]
         if key in self.failed:
@@ -218,7 +220,9 @@ class MeshLibrary:
                 while len(self.packages) >= self.MAX_PACKAGES:
                     self.packages.popitem(last=False)  # evict the oldest
                 self.packages[low] = pkg
-            ex = [x for x in pkg.find_exports('StaticMesh') if x.name == mesh_name]
+            meshes = pkg.find_exports('StaticMesh')
+            ex = ([x for x in meshes if x.name == mesh_name]
+                  or [x for x in meshes if x.name.lower() == key[1]])
             if not ex:
                 raise GeoError(f'{pkg_name}.usx: no mesh {mesh_name}')
             res = parse_staticmesh(pkg, ex[0])

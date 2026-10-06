@@ -3,6 +3,7 @@
 
 import os
 import threading
+from pathlib import Path
 from tkinter import (
     Frame, Label, Button, StringVar, ttk, filedialog, messagebox,
 )
@@ -151,14 +152,14 @@ class ConvertTabMixin:
                         elif in_fmt == "pts":
                             convert_file(f, out_path)
                         elif in_fmt == "l2j":
-                            open(out_path, 'wb').write(open(f, 'rb').read())
+                            Path(out_path).write_bytes(Path(f).read_bytes())
                     elif target_fmt == "l2g":
                         out_path = os.path.join(dst, f"{base_name}.l2g")
                         if os.path.abspath(f) == os.path.abspath(out_path):
                             print(f"  ⚠ Skipping {fname}: source and destination are the same file.")
                             continue
                         if in_fmt == "l2g":
-                            open(out_path, 'wb').write(open(f, 'rb').read())
+                            Path(out_path).write_bytes(Path(f).read_bytes())
                         elif in_fmt == "l2j":
                             l2j2l2g_file(f, out_path)
                         elif in_fmt == "pts":
@@ -171,13 +172,13 @@ class ConvertTabMixin:
                             continue
                         rx, ry = region_of(f)
                         if in_fmt == "pts":
-                            open(out_path, 'wb').write(open(f, 'rb').read())
+                            Path(out_path).write_bytes(Path(f).read_bytes())
                         elif in_fmt == "l2g":
                             l2g2pts_file(f, out_path, rx, ry)
                         elif in_fmt == "l2j":
-                            data = open(f, 'rb').read()
+                            data = Path(f).read_bytes()
                             pts_bytes, _, _, _ = l2j2pts_bytes(data, rx, ry, PROTO_GD)
-                            open(out_path, 'wb').write(pts_bytes)
+                            Path(out_path).write_bytes(pts_bytes)
 
                     print(f"  ✓ Converted: {fname} -> {os.path.basename(out_path)}")
                     success += 1

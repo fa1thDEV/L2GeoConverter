@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import os
 import re
+from pathlib import Path
 
 from .formats import GeoError, quant_h
 
@@ -50,7 +51,7 @@ def find_doordata(client_dir, explicit=None):
 
 
 def _read_text(path):
-    raw = open(path, 'rb').read()
+    raw = Path(path).read_bytes()
     if raw[:2] == b'\xff\xfe':
         return raw.decode('utf-16')
     if raw[:2] == b'\xfe\xff':
