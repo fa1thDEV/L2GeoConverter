@@ -14,6 +14,7 @@ import math
 import os
 import re
 import struct
+from pathlib import Path
 
 from .formats import GeoError, PTS_HEADER, dec_h, dec_nswe, pts_flat_surface, sniff_format
 from .ui import bold, dim, green, progress, red, yellow
@@ -68,7 +69,7 @@ def pip(x, y, verts):
 
 
 def _read_npcpos(path):
-    raw = open(path, 'rb').read()
+    raw = Path(path).read_bytes()
     if raw[:2] == b'\xff\xfe':
         return raw.decode('utf-16')
     if raw[:2] == b'\xfe\xff':

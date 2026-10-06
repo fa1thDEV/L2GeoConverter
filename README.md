@@ -70,6 +70,19 @@ python geotool.py generate path/to/client/ -o ./output --region 20_20
 
 On Windows, `GeoConverter.bat` is provided as a shortcut for drag-and-drop file processing and quick tasks.
 
+### AI agents (LLM CLI and MCP server)
+
+`geotool.py llm` runs one tool per call and prints a single JSON object (no colours or progress bars), so an AI agent can inspect and test geodata without writing scripts:
+
+```bash
+python geotool.py llm list                                    # tool schemas
+python geotool.py llm cell path=geodata/22_22.l2j x=-130824 y=94856
+python geotool.py llm diagnose path=geodata/22_22.l2j max_issues=20
+python geotool.py llm run_tests                               # fast test subset
+```
+
+Tools: `info`, `cell`, `area`, `diagnose`, `diff`, `validate`, `convert`, `unr_info`, `run_tests`. The same tools are served over MCP (stdio) by `python geotool.py mcp`; `.mcp.json` registers it for Claude Code, and parsed regions stay cached between calls.
+
 ---
 
 ## Visual Guide & Geodata Mechanics
@@ -97,7 +110,7 @@ In Lineage 2 geodata, each cell (16x16 world units) stores an elevation ($Z$) an
    - On Cell B $(gx+1, gy)$: `nswe &= ~FLAG_WEST` (`0x02`).
    The player's client renders open, flat terrain, but the server collision matrix rejects movement packets attempting to cross the boundary.
 2. **Solid Column**: Set the target cell's bitmask to `0x00` (`FLAG_NONE`). Characters cannot enter this 16x16 coordinate column from any angle.
-3. **One-Way Traps (`NSWE_ASYMMETRY`)**: If Cell A allows East movement but Cell B forbids West return, a player walking into Cell B becomes permanently stuck. The diagnostic engine scans for this asymmetry and can restore bidirectional passage with `--fix`.
+3. **One-Way Traps (`NSWE_ASYMMETRY`)**: If Cell A allows East movement but Cell B forbids West return, a player walking into Cell B becomes permanently stuck. The diagnostic engine scans for this asymmetry; `--fix` closes the open side (it never opens a closed flag, since the original collision is not available to prove the passage is real).
 
 ---
 
@@ -141,7 +154,24 @@ Lucera 2 wraps standard 65,536-block L2J data in a rolling XOR/subtraction strea
 
 ## Building from source
 
-Requirements: Python 3.8+ (standard library only).
+Requirements: Python 3.8+. The core toolkit uses only the standard library; optional extras:
+
+```bash
+pip install -r requirements.txt        # Pillow: GUI image scaling (Tkinter must be present)
+pip install -r requirements-accel.txt  # Taichi + NumPy: faster `generate` raycasting
+```
+
+### Running the tests
+
+```bash
+pip install -r requirements-dev.txt
+python -m pytest -m "not slow"   # fast loop (~20 s)
+python -m pytest                 # full suite, including heavy full-region tests
+```
+
+Tests that parse a real Lineage 2 client are skipped unless `L2_CLIENT_DIR` (client root with `Maps/`, `Textures/`, `StaticMeshes/`) and `L2_GEODATA_DIR` (server geodata folder) point at one. CI runs lint plus the test suite on Linux and Windows for every push.
+
+### Standalone executable
 
 To build the standalone Windows executable:
 ```bash

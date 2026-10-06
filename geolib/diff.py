@@ -7,6 +7,7 @@ import os
 import random
 import re
 import struct
+from pathlib import Path
 
 from .formats import BLOCKS, PTS_HEADER, GeoError, parse_region, sniff_format, pts_flat_surface
 from .ui import bold, cyan, dim, green, progress, red, yellow
@@ -47,7 +48,7 @@ def sampled_surface(path, wanted):
     Walks the file as a stream, decoding only the needed blocks —
     an order of magnitude faster than a full parse_region."""
     fmt = sniff_format(path)
-    data = open(path, 'rb').read()
+    data = Path(path).read_bytes()
     if fmt == 'l2g':
         from .formats import L2GCodec
         data = L2GCodec.decrypt(data)

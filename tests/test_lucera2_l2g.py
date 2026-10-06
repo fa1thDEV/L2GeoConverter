@@ -6,10 +6,12 @@ import os
 import struct
 import tempfile
 import unittest
+from pathlib import Path
 
 from geolib.formats import L2GCodec, BLOCKS, dec_h, dec_nswe, enc_cell
 from geolib.convert import l2j2pts_bytes, l2g2l2j_file, l2j2l2g_file, validate_l2j_bytes
 from geolib.diagnostics import GeoDiagnosticEngine, cmd_diagnose
+from tests.support import slow
 
 
 class TestLucera2L2G(unittest.TestCase):
@@ -39,7 +41,7 @@ class TestLucera2L2G(unittest.TestCase):
             for _ in range(BLOCKS):
                 raw_l2j.append(0)
                 raw_l2j.extend(struct.pack('<h', 0))
-            open(l2j_path, 'wb').write(raw_l2j)
+            Path(l2j_path).write_bytes(raw_l2j)
 
             # Convert L2J -> L2G
             l2j2l2g_file(l2j_path, l2g_path)
@@ -49,9 +51,10 @@ class TestLucera2L2G(unittest.TestCase):
             l2g2l2j_file(l2g_path, restored_l2j_path)
             self.assertTrue(os.path.isfile(restored_l2j_path))
 
-            restored_data = open(restored_l2j_path, 'rb').read()
+            restored_data = Path(restored_l2j_path).read_bytes()
             self.assertEqual(restored_data, bytes(raw_l2j))
 
+    @slow
     def test_ai_diagnostics_cliff_repair(self):
         with tempfile.TemporaryDirectory() as td:
             geo_path = os.path.join(td, "20_20.l2j")
@@ -67,7 +70,7 @@ class TestLucera2L2G(unittest.TestCase):
                     nswe = 15  # all directions open
                     raw.extend(struct.pack('<H', enc_cell(h, nswe)))
 
-            open(geo_path, 'wb').write(raw)
+            Path(geo_path).write_bytes(raw)
 
             engine = GeoDiagnosticEngine(cliff_threshold=48)
             report = engine.analyze(geo_path)

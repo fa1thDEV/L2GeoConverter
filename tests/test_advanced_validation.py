@@ -30,6 +30,7 @@ from geolib.editor import (
     recalculate_slope_flags, encode_blocks_to_l2j, save_edited_region,
     L2ClientMemoryScanner, BLOCKS_PER_AXIS, CELLS_PER_BLOCK, CELLS_PER_AXIS
 )
+from tests.support import slow
 
 
 def make_mock_blocks(default_h: int = 100, default_nswe: int = 15):
@@ -204,6 +205,7 @@ class TestAdvancedValidation(unittest.TestCase):
             self.assertGreaterEqual(q, -32768)
             self.assertLessEqual(q, 32767)
 
+    @slow
     def test_013_repeated_shift_z_zero_sum(self):
         blocks = make_mock_blocks(128)
         shift_z_blocks(blocks, 120)
@@ -217,6 +219,7 @@ class TestAdvancedValidation(unittest.TestCase):
         self.assertEqual(res["shifted_blocks"], 0)
         self.assertEqual(res["void_filled"], BLOCKS)
 
+    @slow
     def test_015_delete_z_range_inverted_infinite(self):
         blocks = make_mock_blocks(100)
         # Delete entire universe [-32768, 32767]
@@ -804,6 +807,7 @@ class TestAdvancedValidation(unittest.TestCase):
         self.assertEqual(geo["rx"], 21)
         self.assertEqual(geo["ry"], 16)
 
+    @slow
     def test_100_full_cycle_advanced_validation(self):
         # Final test: End-to-end multi-format pipeline test
         # 1. Create base blocks

@@ -84,7 +84,8 @@ Salida en consola:
 ```powershell
 .\GeoConverter.bat diagnose "geodata/16_20.l2g" --fix -o ./geodata_reparada
 ```
-- Repara sellando flags hacia desniveles infranqueables y garantizando simetría bidireccional en rampas transitables ($\Delta Z \le 32$).
+- Repara sellando flags hacia desniveles infranqueables y, en asimetrías transitables ($\Delta Z \le 32$), cerrando el lado abierto: nunca abre un flag cerrado, porque sin la colisión original no se puede saber si ahí hay una pared.
+- Las capas se emparejan desde **ambas** celdas, así que una capa superior que solo existe en la vecina también se revisa.
 
 #### E. Modo JSON para Integración y Scripts (`--json`)
 ```powershell
@@ -125,52 +126,81 @@ Abre un servidor HTTP local en `http://127.0.0.1:8777` donde puedes explorar vis
 
 ## 3. Uso Programático con Python
 
-### A. Cargar, Modificar y Guardar Geodata con `l2geo_core.py`
-```python
-from l2geo_core import load_geodata, save_geodata, FLAG_ALL, FLAG_NONE
+Toda la API vive en el paquete `geolib`. Una región se representa como una lista de
+65.536 bloques; cada bloque tiene 64 celdas y cada celda es una lista de capas
+`(z, nswe)`. Las alturas se cuantizan a múltiplos de 8 unidades al guardar.
 
-# Carga automática detectando .l2g, .l2j o .dat
-region = load_geodata("1-Server-copilado/gameserver/geodata/16_20.l2g")
+### A. Cargar, Consultar, Modificar y Guardar
+```python
+from geolib.formats import parse_region, region_of
+from geolib.diagnostics import world_to_geo, get_cell_layers, set_cell_layers
+from geolib.editor import save_edited_region, FLAG_ALL, FLAG_EAST, FLAG_WEST
+
+path = "gameserver/geodata/16_20.l2g"
+rx, ry = region_of(path)                 # (16, 20) a partir del nombre del archivo
+blocks = parse_region(path)              # detecta .l2g, .l2j o _conv.dat automáticamente
 
 # Consultar altura y movimiento en coordenadas de mundo
-gx, gy = region.world_to_geo(-130824, 94856)
-z = region.get_height(gx, gy)
-nswe = region.get_nswe(gx, gy)
+gx, gy = world_to_geo(rx, ry, -130824, 94856)
+z, nswe = get_cell_layers(blocks, gx, gy)[0]
+print(f"celda ({gx}, {gy}): Z={z} NSWE={nswe:04b}")
 
-# Esculpir una plataforma transitable
+# Esculpir una plataforma de 10×10 celdas a Z=-2900
 for x in range(gx, gx + 10):
     for y in range(gy, gy + 10):
-        # Modificar celda
-        pass
+        set_cell_layers(blocks, x, y, [(-2900, FLAG_ALL)])
 
-# Guardar directamente en formato Lucera 2 encriptado
-save_geodata(region, "16_20_modificado.l2g")
+# Pared invisible entre (gx, gy) y (gx+1, gy): quitar Este en A y Oeste en B
+za, na = get_cell_layers(blocks, gx, gy)[0]
+zb, nb = get_cell_layers(blocks, gx + 1, gy)[0]
+set_cell_layers(blocks, gx, gy, [(za, na & ~FLAG_EAST)])
+set_cell_layers(blocks, gx + 1, gy, [(zb, nb & ~FLAG_WEST)])
+
+# Guardar en Lucera 2 (.l2g), L2J (.l2j) o PTS (_conv.dat)
+save_edited_region(blocks, "out/16_20.l2g", target_format="l2g", rx=rx, ry=ry)
+save_edited_region(blocks, "out/16_20_conv.dat", target_format="pts", rx=rx, ry=ry)
 ```
 
-### B. Generación y Parches con `l2geo_generator.py`
+> Usa siempre `set_cell_layers` para escribir: los bloques planos comparten una
+> única lista entre sus 64 celdas y esta función hace la copia necesaria.
+
+### B. Operaciones por Lote y Diagnóstico
 ```python
-from l2geo_generator import sculpt_flat_plateau, create_flat_region, apply_geo_patch_json
+import os
+from geolib.formats import parse_region
+from geolib.editor import (
+    shift_z_blocks, delete_z_range_blocks, recalculate_slope_flags, save_edited_region,
+)
+from geolib.diagnostics import GeoDiagnosticEngine
 
-# Crear una región vacía lista para poblar
-region = create_flat_region(region_x=20, region_y=20, default_z=0)
+blocks = parse_region("out/16_20.l2g")
+shift_z_blocks(blocks, delta_z=-64)                      # bajar toda la región 64u
+delete_z_range_blocks(blocks, min_z=-1000, max_z=0)      # quitar techos/losas en ese rango
+print(recalculate_slope_flags(blocks, max_climb_z=24))   # cerrar pasos con escalón > 24u
+save_edited_region(blocks, "out/16_20.l2j", target_format="l2j", rx=16, ry=20)
 
-# Esculpir un coliseo elevado de 200x200 celdas a altura Z=100
-sculpt_flat_plateau(region, start_geo_x=500, start_geo_y=500, width=200, length=200, target_z=100)
+engine = GeoDiagnosticEngine(cliff_threshold=48, min_clearance=32)
+report = engine.analyze("out/16_20.l2j", max_issues=20)
+print(report["stats"], report["sample_issues"][:3])
 
-# Aplicar parche JSON
-patch_spec = {
-    "region": "20_20",
-    "patches": [
-        {
-            "type": "plateau",
-            "box": [100, 100, 50, 50],
-            "z": 50,
-            "nswe": 15
-        }
-    ]
-}
-apply_geo_patch_json(region, patch_spec)
+os.makedirs("repaired", exist_ok=True)
+engine.repair_and_save("out/16_20.l2j", "repaired/16_20.l2j")
 ```
+
+### C. Modo para IA (CLI JSON y servidor MCP)
+
+`geotool.py llm` ejecuta una herramienta por llamada e imprime un único objeto JSON, sin colores ni barras de progreso. Así una IA puede inspeccionar y probar la geodata sin escribir scripts:
+
+```powershell
+python geotool.py llm list                                    # esquemas de las herramientas
+python geotool.py llm cell path=geodata/16_20.l2g x=-130824 y=94856
+python geotool.py llm area path=geodata/16_20.l2g gx=10 gy=1830 width=8 height=8 field=dirs
+python geotool.py llm diagnose path=geodata/16_20.l2g max_issues=20
+python geotool.py llm unr_info path=cliente/Maps/14_24.unr
+python geotool.py llm run_tests                               # tests rápidos
+```
+
+Herramientas: `info`, `cell`, `area`, `diagnose`, `diff`, `validate`, `convert`, `unr_info`, `run_tests`. Las mismas se sirven por MCP con `python geotool.py mcp`; el archivo `.mcp.json` del repositorio lo registra para Claude Code, y las regiones ya leídas quedan en caché entre llamadas.
 
 ---
 
@@ -202,7 +232,7 @@ Cada celda de geodata ($16 \times 16$ unidades de mundo) almacena su cota $Z$ y 
 2. **Columna / Bloque Sólido**:
    - Asignar `nswe = 0x00` a la celda completa. Ningún personaje puede entrar desde ningún ángulo.
 3. **Paredes Trampa Unidireccionales (`NSWE_ASYMMETRY`)**:
-   - Ocurre cuando una celda permite ir al Este, pero la contigua prohíbe volver al Oeste. El jugador entra pero queda atrapado. La herramienta detecta estas asimetrías y las repara con `--fix`.
+   - Ocurre cuando una celda permite ir al Este, pero la contigua prohíbe volver al Oeste. El jugador entra pero queda atrapado. La herramienta detecta estas asimetrías y, con `--fix`, cierra el lado abierto.
 
 ---
 
