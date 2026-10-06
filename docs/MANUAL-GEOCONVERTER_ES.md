@@ -187,6 +187,21 @@ os.makedirs("repaired", exist_ok=True)
 engine.repair_and_save("out/16_20.l2j", "repaired/16_20.l2j")
 ```
 
+### C. Modo para IA (CLI JSON y servidor MCP)
+
+`geotool.py llm` ejecuta una herramienta por llamada e imprime un único objeto JSON, sin colores ni barras de progreso. Así una IA puede inspeccionar y probar la geodata sin escribir scripts:
+
+```powershell
+python geotool.py llm list                                    # esquemas de las herramientas
+python geotool.py llm cell path=geodata/16_20.l2g x=-130824 y=94856
+python geotool.py llm area path=geodata/16_20.l2g gx=10 gy=1830 width=8 height=8 field=dirs
+python geotool.py llm diagnose path=geodata/16_20.l2g max_issues=20
+python geotool.py llm unr_info path=cliente/Maps/14_24.unr
+python geotool.py llm run_tests                               # tests rápidos
+```
+
+Herramientas: `info`, `cell`, `area`, `diagnose`, `diff`, `validate`, `convert`, `unr_info`, `run_tests`. Las mismas se sirven por MCP con `python geotool.py mcp`; el archivo `.mcp.json` del repositorio lo registra para Claude Code, y las regiones ya leídas quedan en caché entre llamadas.
+
 ---
 
 ## 4. Guía Visual: Creación de Barreras Invisibles y Diagnóstico
