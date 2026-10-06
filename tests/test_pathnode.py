@@ -14,6 +14,7 @@ from geolib.pathnode import (
     _write_secindex, cmd_pathnode, compile_region, decode_record, encode_record,
     octant, parse_idx, popcount4, read_bin, region_origin,
 )
+from tests.support import slow
 
 
 def _flat_pts(path, rx, ry, h=-4656):
@@ -97,6 +98,7 @@ class TJunctionTests(unittest.TestCase):
 
 
 class CmdWriteTests(unittest.TestCase):
+    @slow
     def test_writes_bin_idx_dummy_and_zone_grid(self):
         rx, ry = 18, 13
         with tempfile.TemporaryDirectory() as td:
@@ -278,6 +280,7 @@ class AxisOrderTests(unittest.TestCase):
 
 
 class WallLinkTests(unittest.TestCase):
+    @slow
     def test_east_link_does_not_cross_nswe_wall(self):
         rx, ry = 18, 13
         with tempfile.TemporaryDirectory() as td:

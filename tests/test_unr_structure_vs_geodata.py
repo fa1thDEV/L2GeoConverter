@@ -41,14 +41,12 @@ from geolib.unrview import (
     _in_region, _area2, _pick, _shift
 )
 from geolib.viewer import ViewerState
+from tests.support import CLIENT_DIR, GEO_DIR, HAS_REAL_CLIENT, needs_client
 
 
-CLIENT_DIR = r"E:\EndlessWar-proyecto\2-Juego - para pruebas"
 MAPS_DIR = os.path.join(CLIENT_DIR, "Maps")
 TEX_DIR = os.path.join(CLIENT_DIR, "Textures")
 USX_DIR = os.path.join(CLIENT_DIR, "StaticMeshes")
-GEO_DIR = r"E:\EndlessWar-proyecto\1-Server-copilado\gameserver\geodata"
-HAS_REAL_CLIENT = os.path.isdir(MAPS_DIR) and os.path.isdir(GEO_DIR)
 
 
 class TestUnrStructureVsGeodata(unittest.TestCase):
@@ -80,19 +78,23 @@ class TestUnrStructureVsGeodata(unittest.TestCase):
     # PART 1: UNR MAP PARSING, ACTORS & EXPORTS (Tests 1-20)
     # =========================================================================
 
+    @needs_client
     def test_001_unr_file_exists(self):
         self.assertTrue(os.path.exists(self.map_22_22_path), "22_22.unr must exist")
 
+    @needs_client
     def test_002_unr_package_signature(self):
         pkg = Package(self.map_22_22_path)
         self.assertGreater(len(pkg.exports), 1000, "22_22.unr must contain thousands of exports")
         self.assertGreater(len(pkg.names), 500, "22_22.unr must contain name table")
 
+    @needs_client
     def test_003_unr_terrain_info_presence(self):
         pkg = Package(self.map_22_22_path)
         tis = pkg.find_exports("TerrainInfo")
         self.assertGreaterEqual(len(tis), 1, "22_22.unr must export at least one TerrainInfo")
 
+    @needs_client
     def test_004_unr_terrain_info_properties(self):
         pkg = Package(self.map_22_22_path)
         tis = pkg.find_exports("TerrainInfo")
@@ -100,6 +102,7 @@ class TestUnrStructureVsGeodata(unittest.TestCase):
         self.assertIn("Location", props)
         self.assertIn("TerrainScale", props)
 
+    @needs_client
     def test_005_terrain_scale_vector_validity(self):
         pkg = Package(self.map_22_22_path)
         props = read_properties(pkg, pkg.find_exports("TerrainInfo")[0])
@@ -108,32 +111,39 @@ class TestUnrStructureVsGeodata(unittest.TestCase):
         self.assertGreater(sy, 0.0)
         self.assertGreater(sz, 0.0)
 
+    @needs_client
     def test_006_heightmap_texture_package_resolution(self):
         self.assertEqual(len(self.heights_22_22), 256)
         self.assertEqual(len(self.heights_22_22[0]), 256)
 
+    @needs_client
     def test_007_terrain_holes_is_set(self):
         self.assertIsInstance(self.holes_22_22, set)
 
+    @needs_client
     def test_008_static_mesh_actor_exports_exist(self):
         pkg = Package(self.map_22_22_path)
         actors = pkg.find_exports("StaticMeshActor")
         self.assertGreater(len(actors), 100, "22_22.unr must contain multiple StaticMeshActors")
 
+    @needs_client
     def test_009_static_mesh_actor_properties(self):
         pkg = Package(self.map_22_22_path)
         actors = pkg.find_exports("StaticMeshActor")
         props = read_properties(pkg, actors[0])
         self.assertTrue("Location" in props or "StaticMesh" in props)
 
+    @needs_client
     def test_010_static_mesh_import_reference(self):
         pkg = Package(self.map_22_22_path)
         sm_imports = [imp for imp in pkg.imports if imp[1] == "StaticMesh"]
         self.assertGreater(len(sm_imports), 10)
 
+    @needs_client
     def test_011_mesh_library_load(self):
         self.assertIsNotNone(self.mesh_lib)
 
+    @needs_client
     def test_012_bsp_model_exports(self):
         pkg = Package(self.map_22_22_path)
         models = pkg.find_exports("Model")
@@ -155,6 +165,7 @@ class TestUnrStructureVsGeodata(unittest.TestCase):
         tri = ((0, 0, 0), (100, 0, 0), (0, 100, 0))
         self.assertTrue(bsp_face_collides(tri, 0))
 
+    @needs_client
     def test_017_blocking_volume_detection(self):
         pkg = Package(self.map_22_22_path)
         bvs = pkg.find_exports("BlockingVolume")
@@ -243,13 +254,16 @@ class TestUnrStructureVsGeodata(unittest.TestCase):
         self.assertAlmostEqual(m[0][1], -1.0, places=2)
         self.assertAlmostEqual(m[1][0], 1.0, places=2)
 
+    @needs_client
     def test_034_gather_collision_triangles_count(self):
         self.assertGreater(self.meta_22_22["nmesh"], 1000)
 
+    @needs_client
     def test_035_mesh_vertex_coordinates_finite(self):
         self.assertTrue(math.isfinite(self.meta_22_22["zmin"]))
         self.assertTrue(math.isfinite(self.meta_22_22["zmax"]))
 
+    @needs_client
     def test_036_blocking_volume_triangles_extraction(self):
         pkg = Package(self.map_22_22_path)
         tris = volume_triangles(pkg, VIEW_BLOCKING_VOLUME_CLASSES)
@@ -273,11 +287,13 @@ class TestUnrStructureVsGeodata(unittest.TestCase):
         nz = e1[0]*e2[1] - e1[1]*e2[0]
         self.assertAlmostEqual(nz, 0.0)
 
+    @needs_client
     def test_039_client_dirs_detection(self):
         m, u = client_dirs(CLIENT_DIR)
         self.assertTrue(os.path.isdir(m))
         self.assertTrue(os.path.isdir(u))
 
+    @needs_client
     def test_040_guess_client(self):
         from geolib.unrview import guess_client
         cand = guess_client(MAPS_DIR)
@@ -287,17 +303,21 @@ class TestUnrStructureVsGeodata(unittest.TestCase):
     # PART 3: TERRAIN HEIGHTS & GEODATA CORRELATION (Tests 41-60)
     # =========================================================================
 
+    @needs_client
     def test_041_load_terrain_grid_size(self):
         self.assertEqual(len(self.heights_22_22), 256)
         self.assertEqual(len(self.heights_22_22[0]), 256)
 
+    @needs_client
     def test_042_terrain_cells_output_shape(self):
         self.assertEqual(len(self.hcell_22_22), CELLS_PER_AXIS)
         self.assertEqual(len(self.hcell_22_22[0]), CELLS_PER_AXIS)
 
+    @needs_client
     def test_043_server_geodata_load_22_22(self):
         self.assertEqual(len(self.blocks_22_22), BLOCKS)
 
+    @needs_client
     def test_044_terrain_vs_geodata_open_ground_height(self):
         gx, gy = 1800, 1800
         b_idx = (gy // 8) * 256 + (gx // 8)
@@ -306,6 +326,7 @@ class TestUnrStructureVsGeodata(unittest.TestCase):
         unr_h = quant_h(int(round(self.hcell_22_22[gy][gx])))
         self.assertLessEqual(abs(geo_h - unr_h), 16)
 
+    @needs_client
     def test_045_terrain_vs_geodata_point_100_100(self):
         gx, gy = 100, 100
         b_idx = (gy // 8) * 256 + (gx // 8)
@@ -314,6 +335,7 @@ class TestUnrStructureVsGeodata(unittest.TestCase):
         unr_h = quant_h(int(round(self.hcell_22_22[gy][gx])))
         self.assertLessEqual(abs(geo_h - unr_h), 16)
 
+    @needs_client
     def test_046_terrain_vs_geodata_point_500_500(self):
         gx, gy = 500, 500
         b_idx = (gy // 8) * 256 + (gx // 8)
@@ -337,11 +359,13 @@ class TestUnrStructureVsGeodata(unittest.TestCase):
         ml_cells = [[(100, 15), (200, 15)] for _ in range(64)]
         self.assertEqual(block_type(ml_cells), 2)
 
+    @needs_client
     def test_050_geodata_22_22_block_distribution(self):
         types, hmin, hmax, lmax, smin = summarize(self.blocks_22_22)
         self.assertEqual(len(types), 65536)
         self.assertGreater(types.count(1), 1000)
 
+    @needs_client
     def test_051_geodata_22_22_z_bounds(self):
         types, hmin, hmax, lmax, smin = summarize(self.blocks_22_22)
         self.assertGreater(max(hmax), -1000)
@@ -396,6 +420,7 @@ class TestUnrStructureVsGeodata(unittest.TestCase):
     def test_059_z_calibration_constant(self):
         self.assertAlmostEqual(Z_CALIBRATION, 43.35, places=2)
 
+    @needs_client
     def test_060_holes_masking_detection(self):
         for h in list(self.holes_22_22)[:5]:
             self.assertIsInstance(h, tuple)
@@ -405,6 +430,7 @@ class TestUnrStructureVsGeodata(unittest.TestCase):
     # PART 4: STATIC MESH OBSTACLES, ARCHES & MULTILAYERS (Tests 61-80)
     # =========================================================================
 
+    @needs_client
     def test_061_multilayer_cell_has_multiple_layers(self):
         found_ml = False
         for b in self.blocks_22_22:
@@ -416,6 +442,7 @@ class TestUnrStructureVsGeodata(unittest.TestCase):
                 break
         self.assertTrue(found_ml, "22_22 must contain multi-layer cells under bridges/structures")
 
+    @needs_client
     def test_062_multilayer_cell_height_ordering(self):
         for b in self.blocks_22_22:
             for cell in b:
@@ -426,6 +453,7 @@ class TestUnrStructureVsGeodata(unittest.TestCase):
                         self.assertGreater(heights[i], heights[i+1])
                     return
 
+    @needs_client
     def test_063_headroom_separation(self):
         for b in self.blocks_22_22:
             for cell in b:
@@ -488,6 +516,7 @@ class TestUnrStructureVsGeodata(unittest.TestCase):
         self.assertEqual(packed[0], 2)
         self.assertGreater(len(packed), 129)
 
+    @needs_client
     def test_071_archway_preserves_lower_movement(self):
         for b in self.blocks_22_22:
             for cell in b:
@@ -557,6 +586,7 @@ class TestUnrStructureVsGeodata(unittest.TestCase):
     # PART 5: 3D UNRVIEW PAYLOAD & VIEWER INTEGRATION (Tests 81-100)
     # =========================================================================
 
+    @needs_client
     def test_081_pack_region_unr_header(self):
         self.assertGreaterEqual(len(self.payload_22_22), 32)
         magic, ntri, zmin, zmax, nmesh, nbsp, nblk, skipped = HEADER.unpack_from(self.payload_22_22, 0)
@@ -564,20 +594,24 @@ class TestUnrStructureVsGeodata(unittest.TestCase):
         self.assertEqual(ntri, self.meta_22_22["ntri"])
         self.assertLess(zmin, zmax)
 
+    @needs_client
     def test_082_pack_region_unr_payload_size_formula(self):
         ntri = self.meta_22_22["ntri"]
         expected_size = 32 + (ntri * 36) + (ntri * 1)
         self.assertEqual(len(self.payload_22_22), expected_size)
 
+    @needs_client
     def test_083_pack_region_unr_z_bounds_match_meta(self):
         _, _, zmin, zmax, _, _, _, _ = HEADER.unpack_from(self.payload_22_22, 0)
         self.assertAlmostEqual(zmin, self.meta_22_22["zmin"], places=2)
         self.assertAlmostEqual(zmax, self.meta_22_22["zmax"], places=2)
 
+    @needs_client
     def test_084_pack_region_unr_kind_counts(self):
         _, ntri, _, _, nmesh, nbsp, nblk, _ = HEADER.unpack_from(self.payload_22_22, 0)
         self.assertEqual(ntri, nmesh + nbsp + nblk)
 
+    @needs_client
     def test_085_pack_region_unr_kinds_buffer_values(self):
         ntri = self.meta_22_22["ntri"]
         kinds_offset = 32 + (ntri * 36)
@@ -585,28 +619,33 @@ class TestUnrStructureVsGeodata(unittest.TestCase):
         for k in kinds:
             self.assertIn(k, (0, 1, 2))
 
+    @needs_client
     def test_086_viewer_state_detects_l2g_files(self):
         state = ViewerState(primary=GEO_DIR, client_dir=CLIENT_DIR)
         files = state.files()
         self.assertIn("22_22", files)
         self.assertTrue(files["22_22"].endswith(".l2g"))
 
+    @needs_client
     def test_087_viewer_state_parses_22_22_geodata(self):
         state = ViewerState(primary=GEO_DIR, client_dir=CLIENT_DIR)
         parsed = state.parsed("22_22")
         self.assertIsNotNone(parsed)
         self.assertEqual(len(parsed), BLOCKS)
 
+    @needs_client
     def test_088_viewer_state_unr_payload_caching(self):
         state = ViewerState(primary=GEO_DIR, client_dir=CLIENT_DIR)
         p1 = state.unr_payload("22_22")
         p2 = state.unr_payload("22_22")
         self.assertIs(p1, p2, "ViewerState must return cached UNR payload on subsequent calls")
 
+    @needs_client
     def test_089_viewer_state_files_discovery_count(self):
         state = ViewerState(primary=GEO_DIR, client_dir=CLIENT_DIR)
         self.assertGreaterEqual(len(state.files()), 150)
 
+    @needs_client
     def test_090_viewer_state_thread_safety(self):
         state = ViewerState(primary=GEO_DIR, client_dir=CLIENT_DIR)
         results = []

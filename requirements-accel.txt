@@ -1,0 +1,6 @@
+# Optional raycast accelerator for `geotool.py generate` (GPU on NVIDIA/CUDA,
+# otherwise multithreaded CPU). Output is byte-for-byte identical to the
+# pure-Python path, just faster.
+-r requirements.txt
+taichi
+numpy

@@ -39,7 +39,7 @@ from geolib import (
 )
 from geolib.doors import find_doordata
 from geolib.formats import GeoError, PROTO_CLI_HELP, normalize_protocol
-from geolib.generate import MAX_CPU_PCT, MIN_FREE_RAM_GB
+from geolib.resources import MAX_CPU_PCT, MIN_FREE_RAM_GB
 from geolib.ui import BANNER, bold, cyan, dim
 
 
